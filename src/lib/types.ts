@@ -1,0 +1,116 @@
+export interface PlayerStats {
+  matches: number;
+  runs: number;
+  wickets: number;
+  bestScore: number;
+  bestBowling: string;
+  strikeRate: number;
+  battingAverage: number;
+  bowlingEconomy: number;
+}
+
+export interface Player {
+  id: number;
+  name: string;
+  gender: 'Male' | 'Female' | 'Other';
+  role: 'Batsman' | 'Bowler' | 'All-rounder';
+  team: string;
+  society: string;
+  stats: PlayerStats;
+}
+
+export interface TeamInMatch {
+  name: string;
+  players: Player[];
+  runs: number;
+  wickets: number;
+  overs: number;
+  inningCompleted: boolean;
+}
+
+export interface ScorecardInning {
+  team: string | null;
+  batsmen: {
+    [playerId: number]: {
+      playerId: number;
+      runs: number;
+      balls: number;
+      fours: number;
+      sixes: number;
+      out: boolean;
+    };
+  };
+  bowlers: {
+    [playerId: number]: {
+      playerId: number;
+      runs: number;
+      overs: number;
+      wickets: number;
+    };
+  };
+  extraRuns: number;
+}
+
+export interface Scorecard {
+  inning1: ScorecardInning;
+  inning2: ScorecardInning;
+}
+
+export interface Match {
+  id: number;
+  overs: number;
+  venue: string;
+  teams: [TeamInMatch, TeamInMatch];
+  status: 'scheduled' | 'live' | 'completed';
+  result: string | null;
+  playerOfTheMatch: string | null;
+  scorecard: Scorecard | null;
+}
+
+export interface LiveMatch extends Match {
+  tossWinner?: number;
+  currentInning: 1 | 2;
+  currentBatsmen: {
+    striker: Player | null;
+    nonStriker: Player | null;
+  };
+  currentBowler: Player | null;
+  currentOver: number;
+  ballsInOver: number;
+}
+
+export interface Tournament {
+  id: number;
+  name: string;
+  venue: string;
+  description: string;
+  format: 'Knockout' | 'Round Robin' | 'Group + Knockout';
+  dates: {
+    start: string;
+    end: string;
+  };
+  teams: any[]; // Replace with a Team type if needed
+  status: 'scheduled' | 'ongoing' | 'completed';
+}
+
+export interface AuctionPlayer extends Player {
+  status: 'Unsold' | 'Sold';
+  bidder: string | null;
+  bidAmount: number;
+}
+
+export interface Auction {
+  tournamentId: number;
+  tournamentName: string;
+  players: AuctionPlayer[];
+  teams: any[]; // Replace with a Team type if needed
+}
+
+export interface AppData {
+  isAdmin: boolean;
+  players: Player[];
+  matches: Match[];
+  tournaments: Tournament[];
+  liveMatch: LiveMatch | null;
+  auction: Auction | null;
+}
