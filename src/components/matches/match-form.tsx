@@ -58,7 +58,7 @@ export function MatchForm() {
   };
 
   return (
-    <AdminGate>
+    <AdminGate block={false} message="Admin access is required to schedule a new match.">
       <Card>
         <CardHeader>
           <CardTitle>Schedule New Match</CardTitle>

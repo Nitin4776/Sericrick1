@@ -53,7 +53,7 @@ export function TournamentForm() {
   };
 
   return (
-    <AdminGate>
+    <AdminGate block={false} message="Admin access is required to schedule a new tournament.">
       <Card>
         <CardHeader>
           <CardTitle>Schedule New Tournament</CardTitle>
