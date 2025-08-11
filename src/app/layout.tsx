@@ -5,7 +5,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { Header } from '@/components/header';
 
 export const metadata: Metadata = {
-  title: 'CrickSeries',
+  title: 'SeriCrick',
   description: 'A modern cricket league management app',
 };
 
