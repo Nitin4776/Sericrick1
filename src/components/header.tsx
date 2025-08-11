@@ -19,8 +19,9 @@ import {
   SheetContent,
   SheetTrigger,
 } from "@/components/ui/sheet"
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Separator } from './ui/separator';
+import { Skeleton } from './ui/skeleton';
 
 const navLinks = [
   { href: '/', label: 'Home' },
@@ -34,6 +35,11 @@ export function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const [isSheetOpen, setSheetOpen] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -68,31 +74,35 @@ export function Header() {
 
       {/* Admin Actions */}
       <div className="hidden md:block">
-        {isAdmin ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" aria-label="Admin Menu">
-                  <ShieldCheck className="h-5 w-5 text-green-600" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Admin Menu</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild><Link href="/live-scoring">Live Scoring</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild><Link href="/auction">Player Auction</Link></DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Logout</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-        ) : (
-          <Button asChild>
-            <Link href="/admin">
-              <User className="mr-2 h-4 w-4" /> Admin Login
-            </Link>
-          </Button>
+        {!isClient ? <Skeleton className="h-10 w-28" /> : (
+            <>
+            {isAdmin ? (
+                <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="icon" aria-label="Admin Menu">
+                    <ShieldCheck className="h-5 w-5 text-green-600" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Admin Menu</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild><Link href="/live-scoring">Live Scoring</Link></DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link href="/auction">Player Auction</Link></DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Logout</span>
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+                </DropdownMenu>
+            ) : (
+            <Button asChild>
+                <Link href="/admin">
+                <User className="mr-2 h-4 w-4" /> Admin Login
+                </Link>
+            </Button>
+            )}
+            </>
         )}
       </div>
 
@@ -120,7 +130,7 @@ export function Header() {
                 </Link>
               ))}
               <Separator />
-               {isAdmin ? (
+               {isClient && isAdmin ? (
                  <>
                   <p className="font-semibold text-sm">Admin</p>
                   <Link href="/live-scoring" onClick={closeSheet} className="text-muted-foreground">Live Scoring</Link>
@@ -129,12 +139,14 @@ export function Header() {
                     <LogOut className="mr-2 h-4 w-4" /> Logout
                   </Button>
                  </>
-               ) : (
+               ) : isClient && !isAdmin ? (
                  <Button asChild onClick={closeSheet}>
                    <Link href="/admin">
                      <User className="mr-2 h-4 w-4" /> Admin Login
                    </Link>
                  </Button>
+               ) : (
+                <Skeleton className="h-10 w-full" />
                )}
             </nav>
           </SheetContent>
