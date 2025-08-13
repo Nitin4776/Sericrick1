@@ -12,7 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Coins, User, Shield, Info, ArrowLeft, BarChart, Users, Trophy } from "lucide-react";
 import { Skeleton } from "../ui/skeleton";
 import { Label } from "../ui/label";
-import { Badge } from "../ui/badge";
+import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -279,6 +279,7 @@ function EndMatchDialog({ open, onOpenChange, onConfirm }: { open: boolean, onOp
 }
 
 function MatchCompletedDialog({ open, onOpenChange, result }: { open: boolean, onOpenChange: (open: boolean) => void, result: string | null }) {
+    const { leaveLiveMatch } = useAppContext();
     return (
       <AlertDialog open={open} onOpenChange={onOpenChange}>
         <AlertDialogContent>
@@ -292,7 +293,10 @@ function MatchCompletedDialog({ open, onOpenChange, result }: { open: boolean, o
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={() => onOpenChange(false)}>Close</AlertDialogAction>
+            <AlertDialogAction onClick={() => {
+                onOpenChange(false)
+                leaveLiveMatch()
+            }}>Close</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -313,10 +317,10 @@ export function LiveScoringDashboard() {
   }, []);
 
   useEffect(() => {
-    if (liveMatch?.status === 'completed') {
+    if (liveMatch?.status === 'completed' && !isMatchCompletedDialogOpen) {
         setMatchCompletedDialogOpen(true);
     }
-  }, [liveMatch?.status]);
+  }, [liveMatch?.status, isMatchCompletedDialogOpen]);
 
   const handleStart = () => {
     if (selectedMatchId) {
@@ -329,8 +333,10 @@ export function LiveScoringDashboard() {
   };
   
   const handleSetNewBatsman = (strikerId: string) => {
-    if (liveMatch?.currentBatsmen.nonStriker && liveMatch?.currentBowler) {
-      setLivePlayers(strikerId, liveMatch.currentBatsmen.nonStriker.id as string, liveMatch.currentBowler.id as string);
+    if (liveMatch?.currentBatsmen.nonStriker) {
+      // If the bowler is null, it means we also need to select a new bowler after this.
+      // We pass the current (null) bowler to keep the flow moving.
+      setLivePlayers(strikerId, liveMatch.currentBatsmen.nonStriker.id as string, liveMatch.currentBowler?.id as string);
     }
   };
 
@@ -391,7 +397,7 @@ export function LiveScoringDashboard() {
   
   const arePlayersSet = liveMatch.currentBatsmen.striker && liveMatch.currentBatsmen.nonStriker && liveMatch.currentBowler;
   const isWicketFallen = liveMatch.currentBatsmen.striker === null && liveMatch.currentBatsmen.nonStriker !== null;
-  const isOverFinished = liveMatch.ballsInOver === 0 && liveMatch.currentOver > 0 && liveMatch.currentBowler === null;
+  const isOverFinished = liveMatch.currentOver > 0 && liveMatch.ballsInOver === 0 && liveMatch.currentBowler === null;
   
   const inningStarted = !!currentInningData?.team;
   const isMatchStarting = !inningStarted;
@@ -426,7 +432,7 @@ export function LiveScoringDashboard() {
                     ): (
                         <div>
                             <Alert>
-                                <AlertTitle>{liveMatch.teams[liveMatch.tossWinner].name} won the toss!</AlertTitle>
+                                <AlertTitle>{liveMatch.teams[liveMatch.tossWinner as number].name} won the toss!</AlertTitle>
                                 <AlertDescription>Choose to bat or bowl.</AlertDescription>
                             </Alert>
                             <div className="mt-4 space-x-2">
@@ -448,7 +454,7 @@ export function LiveScoringDashboard() {
         return <NewBatsmanSelector onConfirm={handleSetNewBatsman} />;
     }
 
-    if (isOverFinished) {
+    if (isOverFinished && !isWicketFallen) {
         return <NewBowlerSelector onConfirm={handleSetNewBowler} />;
     }
 
@@ -513,11 +519,11 @@ export function LiveScoringDashboard() {
 
   const getTeamScore = (teamName: string | null | undefined) => {
     if (!liveMatch?.teams || !teamName) return { runs: 0, wickets: 0, overs: '0.0' };
-    const teamData = liveMatch.teams.find(t => t.name === teamName);
+    const inningData = teamName === liveMatch.scorecard?.inning1.team ? liveMatch.scorecard?.inning1 : liveMatch.scorecard?.inning2;
     return {
-      runs: teamData?.runs ?? 0,
-      wickets: teamData?.wickets ?? 0,
-      overs: teamData?.overs?.toFixed(1) ?? '0.0',
+      runs: inningData?.runs ?? 0,
+      wickets: inningData?.wickets ?? 0,
+      overs: inningData?.overs?.toFixed(1) ?? '0.0',
     };
   };
 

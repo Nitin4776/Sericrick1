@@ -63,8 +63,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       setPlayers(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as unknown as Player)));
     });
     const unsubMatches = onSnapshot(query(collection(db, "matches")), (snapshot) => {
-        const fetchedMatches = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as unknown as Match));
-        fetchedMatches.sort((a,b) => String(a.id).localeCompare(String(b.id)));
+        const fetchedMatches = snapshot.docs.map(doc => ({ ...doc.data(), id: String(doc.id) } as unknown as Match));
         setMatches(fetchedMatches);
     });
     const unsubTournaments = onSnapshot(collection(db, "tournaments"), (snapshot) => {
@@ -363,6 +362,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     match.currentBatsmen = { striker, nonStriker };
     match.currentBowler = bowler;
     
+    // If we're setting a new bowler, it's not the end of an over anymore.
+    if(bowler) {
+      match.previousBowlerId = null;
+    }
+    
     updateLiveMatchInState(match);
   };
 
@@ -398,6 +402,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         match.ballsInOver += 1;
         batsmanStats.balls +=1;
     }
+    
+    const wasLastBallOfOver = match.ballsInOver === 6;
 
     if(isWicket) {
         currentBattingTeam.wickets += 1;
@@ -408,13 +414,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         [match.currentBatsmen.striker, match.currentBatsmen.nonStriker] = [match.currentBatsmen.nonStriker, match.currentBatsmen.striker];
     }
     
-    if (match.ballsInOver === 6) {
+    if (wasLastBallOfOver) {
         match.currentOver += 1;
         bowlerStats.overs = parseFloat((Math.floor(bowlerStats.overs) + 1).toFixed(1));
         match.ballsInOver = 0;
         match.overEvents = [];
         
-        [match.currentBatsmen.striker, match.currentBatsmen.nonStriker] = [match.currentBatsmen.nonStriker, match.currentBatsmen.striker];
+        // Rotate strike only if it's not a wicket on the last ball (new batsman comes in)
+        if (!isWicket) {
+          [match.currentBatsmen.striker, match.currentBatsmen.nonStriker] = [match.currentBatsmen.nonStriker, match.currentBatsmen.striker];
+        }
         
         match.previousBowlerId = match.currentBowler.id;
         match.currentBowler = null; // Prompt for new bowler
@@ -510,7 +519,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const endMatch = async (reason?: string) => {
     if(!liveMatch) return;
 
-    const matchRef = doc(db, "matches", liveMatch.id);
+    const matchRef = doc(db, "matches", liveMatch.id as string);
     const matchDoc = await getDoc(matchRef);
 
     if (!matchDoc.exists()) {
@@ -532,7 +541,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         if (team1Score > team2Score) {
             match.result = `${team1Data!.name} won by ${team1Score - team2Score} runs`;
         } else if (team2Score > team1Score) {
-            const wicketsLeft = team2Data!.players.length - 1 - team2Data!.wickets;
+            const wicketsLeft = team2Data!.players.length - 1 - (team2Data!.wickets || 0);
             match.result = `${team2Data!.name} won by ${wicketsLeft} wickets`;
         } else {
             match.result = "Match Tied";
@@ -550,7 +559,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     for (const playerId of allPlayerIdsInMatch) {
       const player = players.find(p => p.id === playerId);
       if (player) {
-        const playerRef = doc(db, "players", playerId);
+        const playerRef = doc(db, "players", String(playerId));
         
         let runsScored = 0, ballsFaced = 0, wicketsTaken = 0, runsConceded = 0, oversBowled = 0;
         let isOut = false;
