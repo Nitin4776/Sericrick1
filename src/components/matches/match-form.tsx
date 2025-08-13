@@ -14,6 +14,7 @@ import { AdminGate } from "../admin-gate";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Player } from "@/lib/types";
+import { useState } from "react";
 
 const matchSchema = z.object({
   overs: z.coerce.number().min(1, "Overs must be at least 1."),
@@ -36,6 +37,8 @@ type MatchFormValues = z.infer<typeof matchSchema>;
 export function MatchForm() {
   const { players, scheduleMatch } = useAppContext();
   const { toast } = useToast();
+  const [team1Search, setTeam1Search] = useState("");
+  const [team2Search, setTeam2Search] = useState("");
 
   const form = useForm<MatchFormValues>({
     resolver: zodResolver(matchSchema),
@@ -68,6 +71,9 @@ export function MatchForm() {
     toast({ title: "Match Scheduled", description: `${data.team1Name} vs ${data.team2Name} is scheduled.` });
     form.reset();
   };
+  
+  const filteredTeam1Players = players.filter(p => p.name.toLowerCase().includes(team1Search.toLowerCase()));
+  const filteredTeam2Players = players.filter(p => p.name.toLowerCase().includes(team2Search.toLowerCase()));
 
   return (
     <AdminGate block={false} message="Admin access is required to schedule a new match.">
@@ -118,8 +124,14 @@ export function MatchForm() {
                   render={() => (
                     <FormItem>
                       <FormLabel>Team 1 Players</FormLabel>
+                      <Input 
+                        placeholder="Search players..." 
+                        value={team1Search} 
+                        onChange={(e) => setTeam1Search(e.target.value)} 
+                        className="mb-2"
+                      />
                       <ScrollArea className="h-48 w-full rounded-md border p-4">
-                        {players.map((player: Player) => (
+                        {filteredTeam1Players.map((player: Player) => (
                             <FormField
                             key={player.id as string}
                             control={form.control}
@@ -153,8 +165,14 @@ export function MatchForm() {
                   render={() => (
                     <FormItem>
                       <FormLabel>Team 2 Players</FormLabel>
+                      <Input 
+                        placeholder="Search players..." 
+                        value={team2Search} 
+                        onChange={(e) => setTeam2Search(e.target.value)}
+                        className="mb-2"
+                      />
                        <ScrollArea className="h-48 w-full rounded-md border p-4">
-                        {players.map((player) => (
+                        {filteredTeam2Players.map((player) => (
                            <FormField
                             key={player.id as string}
                             control={form.control}
