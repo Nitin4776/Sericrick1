@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -15,7 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Users, Calendar, MapPin, Trophy, PlusCircle, ArrowLeft, BarChart2, Play, StopCircle, Swords, Award } from "lucide-react";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -194,6 +195,15 @@ export function TournamentDetailPageClient({ tournament }: { tournament: Tournam
 
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [isScorecardOpen, setScorecardOpen] = useState(false);
+  const [formattedDates, setFormattedDates] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (tournament && tournament.dates) {
+      const start = new Date(tournament.dates.start).toLocaleDateString();
+      const end = new Date(tournament.dates.end).toLocaleDateString();
+      setFormattedDates(`${start} - ${end}`);
+    }
+  }, [tournament]);
 
   const teamSchema = React.useMemo(() => {
     return createTeamSchema(tournament?.playersPerTeam || 5);
@@ -279,7 +289,9 @@ export function TournamentDetailPageClient({ tournament }: { tournament: Tournam
                         <span className="flex items-center gap-2"><Trophy /> {tournament.format}</span>
                         <span className="flex items-center gap-2"><Users /> {tournament.playersPerTeam} players/team</span>
                         <span className="flex items-center gap-2"><MapPin /> {tournament.venue}</span>
-                        <span className="flex items-center gap-2"><Calendar /> {new Date(tournament.dates.start).toLocaleDateString()} - {new Date(tournament.dates.end).toLocaleDateString()}</span>
+                        <span className="flex items-center gap-2">
+                          <Calendar /> {formattedDates || <Skeleton className="h-4 w-40" />}
+                        </span>
                         <Badge variant={tournament.status === 'completed' ? 'secondary' : 'default'} className="capitalize">{tournament.status}</Badge>
                     </div>
                     {tournament.description && <p className="mt-4 text-muted-foreground max-w-2xl">{tournament.description}</p>}
@@ -418,3 +430,5 @@ export function TournamentDetailPageClient({ tournament }: { tournament: Tournam
     </div>
   );
 }
+
+    
