@@ -401,7 +401,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     updateLiveMatchInState(match);
   };
 
-  const _updateScore = (runs: number, isWicket: boolean, isExtra: boolean, isLegalBall: boolean, isDeclared: boolean = false, isRunOut: boolean = false, runsOffBatForNoBall: number = 0) => {
+  const _updateScore = (runs: number, isWicket: boolean, extraType: 'Wide' | 'No Ball' | null, isLegalBall: boolean, isDeclared: boolean = false, isRunOut: boolean = false, runsOffBatForNoBall: number = 0) => {
     if(!liveMatch || !liveMatch.currentBatsmen.striker || !liveMatch.currentBowler) return;
 
     let match = { ...liveMatch };
@@ -413,16 +413,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const currentBattingTeam = match.teams.find(t => t.name === currentInningData.team)!;
 
     let event = '';
-    if (isWicket && !isRunOut) { // Wicket other than runout
+    if (isWicket && !isRunOut) {
         event = 'W';
-    } else if (isExtra && runsOffBatForNoBall > 0) { // No ball with runs
-        event = `${runsOffBatForNoBall}nb`;
-    } else if (isExtra && !isLegalBall) { // Wide
+    } else if (extraType === 'No Ball') {
+        event = runsOffBatForNoBall > 0 ? `${runsOffBatForNoBall}nb` : 'nb';
+    } else if (extraType === 'Wide') {
         event = 'wd';
-    } else if (isExtra) { // No ball without runs
-        event = 'nb';
-    }
-     else { // Regular runs
+    } else {
         event = `${runs}`;
     }
 
@@ -433,14 +430,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const totalRuns = runs + runsOffBatForNoBall;
     currentBattingTeam.runs += totalRuns;
 
-    if(isExtra) currentInningData.extraRuns += runs;
+    if(extraType) currentInningData.extraRuns += runs;
 
     const bowlerStats = currentInningData.bowlers[match.currentBowler.id] ||= {playerId: match.currentBowler.id as string, runs: 0, overs: 0, wickets: 0};
     bowlerStats.runs += totalRuns;
 
     const batsmanStats = currentInningData.batsmen[match.currentBatsmen.striker.id] ||= {playerId: match.currentBatsmen.striker.id as string, runs: 0, balls: 0, fours: 0, sixes: 0, status: 'not_out'};
     
-    const runsForBatsman = isExtra ? runsOffBatForNoBall : runs;
+    const runsForBatsman = extraType === 'No Ball' ? runsOffBatForNoBall : (extraType === 'Wide' ? 0 : runs);
     batsmanStats.runs += runsForBatsman;
     if(runsForBatsman === 4) batsmanStats.fours += 1;
     if(runsForBatsman === 6) batsmanStats.sixes += 1;
@@ -515,14 +512,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const scoreRun = (runs: number, isDeclared: boolean = false) => _updateScore(runs, false, false, true, isDeclared);
-  const scoreWicket = () => _updateScore(0, true, false, true, false, false);
+  const scoreRun = (runs: number, isDeclared: boolean = false) => _updateScore(runs, false, null, true, isDeclared);
+  const scoreWicket = () => _updateScore(0, true, null, true, false, false);
   const scoreExtra = (type: 'Wide' | 'No Ball', runsOffBat: number = 0) => {
     if (type === 'Wide') {
-        _updateScore(1, false, true, false);
+        _updateScore(1, false, 'Wide', false);
     } else { // No Ball
-        const isLegal = runsOffBat > 0;
-        _updateScore(1, false, true, isLegal, false, false, runsOffBat);
+        _updateScore(1, false, 'No Ball', false, false, false, runsOffBat);
     }
   }
 
@@ -535,7 +531,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     
     // For run-outs, we process runs first. This call will handle the ball count correctly.
     // The wicket part of a run-out is handled separately to assign it to the correct batsman.
-    _updateScore(runs, false, false, true, false, true);
+    _updateScore(runs, false, null, true, false, true);
 
     match = { ...liveMatch }; // Re-fetch state as _updateScore modifies it
     const currentInningData = match.scorecard![`inning${match.currentInning}` as 'inning1' | 'inning2'];
@@ -877,3 +873,5 @@ export const useAppContext = (): AppContextType => {
   return context;
 };
 
+
+    
