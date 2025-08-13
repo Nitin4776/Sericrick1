@@ -23,7 +23,7 @@ export function TournamentList() {
   const { tournaments, isAdmin, deleteTournament } = useAppContext();
   const { toast } = useToast();
 
-  const handleDelete = (id: number, name: string) => {
+  const handleDelete = (id: string, name: string) => {
     deleteTournament(id);
     toast({
         title: "Tournament Deleted",
@@ -43,7 +43,7 @@ export function TournamentList() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {tournaments.map((t: Tournament) => (
-        <Card key={t.id} className="flex flex-col">
+        <Card key={t.id as string} className="flex flex-col">
           <CardHeader>
             <Badge variant="outline" className="w-fit mb-2">{t.format}</Badge>
             <CardTitle>{t.name}</CardTitle>
@@ -77,7 +77,7 @@ export function TournamentList() {
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => handleDelete(t.id, t.name)}>Delete</AlertDialogAction>
+                    <AlertDialogAction onClick={() => handleDelete(t.id as string, t.name)}>Delete</AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>

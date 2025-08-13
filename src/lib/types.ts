@@ -10,7 +10,7 @@ export interface PlayerStats {
 }
 
 export interface Player {
-  id: number;
+  id: number | string;
   name: string;
   gender: 'Male' | 'Female' | 'Other';
   role: 'Batsman' | 'Bowler' | 'All-rounder';
@@ -31,8 +31,8 @@ export interface TeamInMatch {
 export interface ScorecardInning {
   team: string | null;
   batsmen: {
-    [playerId: number]: {
-      playerId: number;
+    [playerId: string]: {
+      playerId: string;
       runs: number;
       balls: number;
       fours: number;
@@ -41,8 +41,8 @@ export interface ScorecardInning {
     };
   };
   bowlers: {
-    [playerId: number]: {
-      playerId: number;
+    [playerId: string]: {
+      playerId: string;
       runs: number;
       overs: number;
       wickets: number;
@@ -57,7 +57,7 @@ export interface Scorecard {
 }
 
 export interface Match {
-  id: number;
+  id: number | string;
   overs: number;
   venue: string;
   teams: [TeamInMatch, TeamInMatch];
@@ -80,7 +80,7 @@ export interface LiveMatch extends Match {
 }
 
 export interface Tournament {
-  id: number;
+  id: number | string;
   name: string;
   venue: string;
   description: string;
@@ -100,7 +100,7 @@ export interface AuctionPlayer extends Player {
 }
 
 export interface Auction {
-  tournamentId: number;
+  tournamentId: number | string;
   tournamentName: string;
   players: AuctionPlayer[];
   teams: any[]; // Replace with a Team type if needed

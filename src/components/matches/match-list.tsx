@@ -19,7 +19,7 @@ export function MatchList() {
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [isScorecardOpen, setScorecardOpen] = useState(false);
 
-  const handleStartScoring = (matchId: number) => {
+  const handleStartScoring = (matchId: string) => {
     startScoringMatch(matchId);
     toast({
         title: "Live scoring started!",
@@ -57,7 +57,7 @@ export function MatchList() {
         ) : (
           <div className="space-y-4">
             {filteredMatches.map(m => (
-              <div key={m.id} className="p-4 bg-background rounded-md border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div key={m.id as string} className="p-4 bg-background rounded-md border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div className="flex-grow">
                   <div className="flex items-center gap-2 mb-1">{getStatusBadge(m.status)}</div>
                   <p className="font-bold">{m.teams[0].name} vs {m.teams[1].name}</p>
@@ -66,7 +66,7 @@ export function MatchList() {
                 </div>
                 <div className="flex space-x-2 shrink-0">
                   {m.status === 'scheduled' && isAdmin && (
-                    <Button onClick={() => handleStartScoring(m.id)} size="sm">
+                    <Button onClick={() => handleStartScoring(m.id as string)} size="sm">
                         <PlayCircle className="h-4 w-4 mr-2" /> Start Scoring
                     </Button>
                   )}

@@ -22,7 +22,7 @@ const InningScorecard = ({ inningData, battingTeamName, bowlingTeamName }: { inn
     const { players } = useAppContext();
     if (!inningData || !inningData.team) return null;
 
-    const getPlayerName = (id: number) => players.find(p => p.id === id)?.name || 'Unknown Player';
+    const getPlayerName = (id: string) => players.find(p => p.id === id)?.name || 'Unknown Player';
 
     const batsmen = Object.values(inningData.batsmen).filter(b => b.balls > 0 || b.runs > 0);
     const bowlers = Object.values(inningData.bowlers).filter(b => b.overs > 0 || b.wickets > 0);

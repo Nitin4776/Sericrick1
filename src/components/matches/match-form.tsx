@@ -12,14 +12,15 @@ import { useToast } from "@/hooks/use-toast";
 import { AdminGate } from "../admin-gate";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
+import type { Player } from "@/lib/types";
 
 const matchSchema = z.object({
   overs: z.coerce.number().min(1, "Overs must be at least 1."),
   venue: z.string().min(2, "Venue is required."),
   team1Name: z.string().min(2, "Team 1 name is required."),
   team2Name: z.string().min(2, "Team 2 name is required."),
-  team1Players: z.array(z.number()).min(1, "Select at least one player for Team 1."),
-  team2Players: z.array(z.number()).min(1, "Select at least one player for Team 2."),
+  team1Players: z.array(z.string()).min(1, "Select at least one player for Team 1."),
+  team2Players: z.array(z.string()).min(1, "Select at least one player for Team 2."),
 });
 
 type MatchFormValues = z.infer<typeof matchSchema>;
@@ -41,8 +42,8 @@ export function MatchForm() {
   });
 
   const onSubmit = (data: MatchFormValues) => {
-    const team1PlayersList = players.filter(p => data.team1Players.includes(p.id));
-    const team2PlayersList = players.filter(p => data.team2Players.includes(p.id));
+    const team1PlayersList = players.filter(p => data.team1Players.includes(p.id as string));
+    const team2PlayersList = players.filter(p => data.team2Players.includes(p.id as string));
 
     scheduleMatch({
       overs: data.overs,
@@ -107,19 +108,19 @@ export function MatchForm() {
                     <FormItem>
                       <FormLabel>Team 1 Players</FormLabel>
                       <ScrollArea className="h-48 w-full rounded-md border p-4">
-                        {players.map((player) => (
+                        {players.map((player: Player) => (
                             <FormField
-                            key={player.id}
+                            key={player.id as string}
                             control={form.control}
                             name="team1Players"
                             render={({ field }) => (
-                                <FormItem key={player.id} className="flex flex-row items-start space-x-3 space-y-0">
+                                <FormItem key={player.id as string} className="flex flex-row items-start space-x-3 space-y-0">
                                     <FormControl>
                                         <Checkbox
-                                            checked={field.value?.includes(player.id)}
+                                            checked={field.value?.includes(player.id as string)}
                                             onCheckedChange={(checked) => {
                                                 return checked
-                                                ? field.onChange([...field.value, player.id])
+                                                ? field.onChange([...field.value, player.id as string])
                                                 : field.onChange(field.value?.filter((value) => value !== player.id))
                                             }}
                                         />
@@ -143,17 +144,17 @@ export function MatchForm() {
                        <ScrollArea className="h-48 w-full rounded-md border p-4">
                         {players.map((player) => (
                            <FormField
-                            key={player.id}
+                            key={player.id as string}
                             control={form.control}
                             name="team2Players"
                             render={({ field }) => (
-                                <FormItem key={player.id} className="flex flex-row items-start space-x-3 space-y-0">
+                                <FormItem key={player.id as string} className="flex flex-row items-start space-x-3 space-y-0">
                                     <FormControl>
                                         <Checkbox
-                                            checked={field.value?.includes(player.id)}
+                                            checked={field.value?.includes(player.id as string)}
                                             onCheckedChange={(checked) => {
                                                 return checked
-                                                ? field.onChange([...field.value, player.id])
+                                                ? field.onChange([...field.value, player.id as string])
                                                 : field.onChange(field.value?.filter((value) => value !== player.id))
                                             }}
                                         />

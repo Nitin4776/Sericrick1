@@ -17,7 +17,7 @@ export function AuctionDashboard() {
 
   const handleStartAuction = () => {
     if (selectedTournamentId) {
-      startAuction(Number(selectedTournamentId));
+      startAuction(selectedTournamentId);
       toast({ title: "Auction Started!", description: "The player auction is now live." });
     }
   };
@@ -55,7 +55,7 @@ export function AuctionDashboard() {
             <SelectTrigger><SelectValue placeholder="Select a tournament..." /></SelectTrigger>
             <SelectContent>
               {tournaments.map(t => (
-                <SelectItem key={t.id} value={t.id.toString()}>{t.name}</SelectItem>
+                <SelectItem key={t.id as string} value={t.id.toString()}>{t.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -87,7 +87,7 @@ export function AuctionDashboard() {
                 </TableHeader>
                 <TableBody>
                     {auction.players.map(p => (
-                        <TableRow key={p.id}>
+                        <TableRow key={p.id as string}>
                             <TableCell className="font-medium">{p.name}</TableCell>
                             <TableCell>{p.role}</TableCell>
                             <TableCell>
@@ -100,7 +100,7 @@ export function AuctionDashboard() {
                                     <div className="flex gap-2">
                                         <Input type="number" id={`bid-amount-${p.id}`} placeholder="Amount" className="w-24 h-9" />
                                         <Input id={`bid-team-${p.id}`} placeholder="Team Name" className="w-32 h-9" />
-                                        <Button size="sm" onClick={() => handlePlaceBid(p.id)}>Bid</Button>
+                                        <Button size="sm" onClick={() => handlePlaceBid(p.id as number)}>Bid</Button>
                                     </div>
                                 )}
                             </TableCell>

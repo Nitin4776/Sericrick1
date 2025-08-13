@@ -23,7 +23,7 @@ export function LiveScoringDashboard() {
 
   const handleStart = () => {
     if (selectedMatchId) {
-      startScoringMatch(Number(selectedMatchId));
+      startScoringMatch(selectedMatchId);
     }
   };
   
@@ -41,7 +41,7 @@ export function LiveScoringDashboard() {
                 <SelectTrigger><SelectValue placeholder="Select a match..." /></SelectTrigger>
                 <SelectContent>
                 {scheduledMatches.map(match => (
-                    <SelectItem key={match.id} value={match.id.toString()}>
+                    <SelectItem key={match.id as string} value={match.id.toString()}>
                     {match.teams[0].name} vs {match.teams[1].name}
                     </SelectItem>
                 ))}

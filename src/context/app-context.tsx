@@ -1,10 +1,11 @@
 "use client";
 
 import type { ReactNode } from 'react';
-import React, from 'react';
-import { createContext, useContext } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { db } from '@/lib/firebase';
+import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, where, getDocs } from 'firebase/firestore';
+import type { AppData, Player, Match, Tournament, LiveMatch, AuctionPlayer, Auction } from '@/lib/types';
 import { useLocalStorage } from '@/hooks/use-local-storage';
-import type { AppData, Player, Match, Tournament, LiveMatch, AuctionPlayer, ScorecardInning, Auction } from '@/lib/types';
 
 const ADMIN_ID = 'User1';
 const ADMIN_PASS = 'Elan2025';
@@ -21,11 +22,11 @@ const defaultAppData: AppData = {
 type AppContextType = AppData & {
   login: (id: string, pass: string) => boolean;
   logout: () => void;
-  addPlayer: (playerData: Omit<Player, 'id' | 'stats'>) => boolean;
-  scheduleMatch: (matchData: Omit<Match, 'id' | 'status' | 'result' | 'playerOfTheMatch' | 'scorecard'>) => void;
-  scheduleTournament: (tournamentData: Omit<Tournament, 'id' | 'teams' | 'status'>) => void;
-  deleteTournament: (tournamentId: number) => void;
-  startScoringMatch: (matchId: number) => void;
+  addPlayer: (playerData: Omit<Player, 'id' | 'stats'>) => Promise<boolean>;
+  scheduleMatch: (matchData: Omit<Match, 'id' | 'status' | 'result' | 'playerOfTheMatch' | 'scorecard'>) => Promise<void>;
+  scheduleTournament: (tournamentData: Omit<Tournament, 'id' | 'teams' | 'status'>) => Promise<void>;
+  deleteTournament: (tournamentId: string) => Promise<void>;
+  startScoringMatch: (matchId: string) => void;
   performToss: () => void;
   selectTossOption: (option: 'Bat' | 'Bowl') => void;
   scoreRun: (runs: number) => void;
@@ -34,74 +35,94 @@ type AppContextType = AppData & {
   endMatch: () => void;
   calculateRankings: () => { bestBatsmen: Player[]; bestBowlers: Player[]; bestAllrounders: Player[]; };
   updateLiveMatchInState: (liveMatch: LiveMatch | null) => void;
-  startAuction: (tournamentId: number) => void;
+  startAuction: (tournamentId: string) => void;
   placeBid: (playerId: number, bidAmount: number, teamName: string) => boolean;
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
-  const [appData, setAppData] = useLocalStorage<AppData>('sericrick_app_state', defaultAppData);
+  const [isAdmin, setIsAdmin] = useLocalStorage<boolean>('sericrick_admin_status', false);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [liveMatch, setLiveMatch] = useLocalStorage<LiveMatch | null>('sericrick_live_match', null);
+  const [auction, setAuction] = useLocalStorage<Auction | null>('sericrick_auction', null);
+
+  useEffect(() => {
+    const unsubPlayers = onSnapshot(collection(db, "players"), (snapshot) => {
+      setPlayers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Player)));
+    });
+    const unsubMatches = onSnapshot(collection(db, "matches"), (snapshot) => {
+      setMatches(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Match)));
+    });
+    const unsubTournaments = onSnapshot(collection(db, "tournaments"), (snapshot) => {
+      setTournaments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Tournament)));
+    });
+
+    return () => {
+      unsubPlayers();
+      unsubMatches();
+      unsubTournaments();
+    };
+  }, []);
 
   const login = (id: string, pass: string): boolean => {
     if (id === ADMIN_ID && pass === ADMIN_PASS) {
-      setAppData(prev => ({ ...prev, isAdmin: true }));
+      setIsAdmin(true);
       return true;
     }
     return false;
   };
 
   const logout = () => {
-    setAppData(prev => ({ ...prev, isAdmin: false }));
+    setIsAdmin(false);
   };
 
-  const addPlayer = (playerData: Omit<Player, 'id' | 'stats'>): boolean => {
-    if (appData.players.some(p => p.name === playerData.name)) {
-      return false;
+  const addPlayer = async (playerData: Omit<Player, 'id' | 'stats'>): Promise<boolean> => {
+    const q = query(collection(db, "players"), where("name", "==", playerData.name));
+    const querySnapshot = await getDocs(q);
+    if (!querySnapshot.empty) {
+      return false; // Player already exists
     }
-    const newPlayer: Player = {
+
+    const newPlayer: Omit<Player, 'id'> = {
       ...playerData,
-      id: Date.now(),
       stats: { matches: 0, runs: 0, wickets: 0, bestScore: 0, bestBowling: '0-0', strikeRate: 0, battingAverage: 0, bowlingEconomy: 0 }
     };
-    setAppData(prev => ({ ...prev, players: [...prev.players, newPlayer] }));
+    await addDoc(collection(db, "players"), newPlayer);
     return true;
   };
   
-  const scheduleMatch = (matchData: Omit<Match, 'id' | 'status' | 'result' | 'playerOfTheMatch' | 'scorecard'>) => {
-    const newMatch: Match = {
+  const scheduleMatch = async (matchData: Omit<Match, 'id' | 'status' | 'result' | 'playerOfTheMatch' | 'scorecard'>) => {
+    const newMatch: Omit<Match, 'id'> = {
       ...matchData,
-      id: Date.now(),
       status: 'scheduled',
       result: null,
       playerOfTheMatch: null,
       scorecard: null,
     };
-    setAppData(prev => ({ ...prev, matches: [...prev.matches, newMatch] }));
+    await addDoc(collection(db, "matches"), newMatch);
   };
 
-  const scheduleTournament = (tournamentData: Omit<Tournament, 'id' | 'teams' | 'status'>) => {
-    const newTournament: Tournament = {
+  const scheduleTournament = async (tournamentData: Omit<Tournament, 'id' | 'teams' | 'status'>) => {
+    const newTournament: Omit<Tournament, 'id'> = {
       ...tournamentData,
-      id: Date.now(),
       teams: [],
       status: 'scheduled',
     };
-    setAppData(prev => ({ ...prev, tournaments: [...prev.tournaments, newTournament]}));
+    await addDoc(collection(db, "tournaments"), newTournament);
   };
 
-  const deleteTournament = (tournamentId: number) => {
-    setAppData(prev => ({
-        ...prev,
-        tournaments: prev.tournaments.filter(t => t.id !== tournamentId)
-    }));
+  const deleteTournament = async (tournamentId: string) => {
+    await deleteDoc(doc(db, "tournaments", tournamentId));
   };
 
-  const startScoringMatch = (matchId: number) => {
-    const match = appData.matches.find(m => m.id === matchId);
+  const startScoringMatch = (matchId: string) => {
+    const match = matches.find(m => m.id === matchId);
     if (!match) return;
 
-    const liveMatch: LiveMatch = {
+    const liveMatchData: LiveMatch = {
       ...JSON.parse(JSON.stringify(match)),
       status: 'live',
       scorecard: {
@@ -114,24 +135,24 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       currentOver: 0,
       ballsInOver: 0,
     };
-    setAppData(prev => ({ ...prev, liveMatch }));
+    setLiveMatch(liveMatchData);
   };
-
-  const updateLiveMatchInState = (liveMatch: LiveMatch | null) => {
-    setAppData(prev => ({...prev, liveMatch}));
+  
+  const updateLiveMatchInState = (liveMatchData: LiveMatch | null) => {
+    setLiveMatch(liveMatchData);
   }
 
   const performToss = () => {
-    if(!appData.liveMatch) return;
-    const match = { ...appData.liveMatch };
+    if(!liveMatch) return;
+    const match = { ...liveMatch };
     const tossWinnerIndex = Math.random() < 0.5 ? 0 : 1;
     match.tossWinner = tossWinnerIndex;
     updateLiveMatchInState(match);
   };
 
   const selectTossOption = (option: 'Bat' | 'Bowl') => {
-    if(!appData.liveMatch || appData.liveMatch.tossWinner === undefined) return;
-    const match = { ...appData.liveMatch };
+    if(!liveMatch || liveMatch.tossWinner === undefined) return;
+    const match = { ...liveMatch };
     const tossWinnerIndex = match.tossWinner;
     
     const battingFirstIndex = (option === 'Bat') ? tossWinnerIndex : 1 - tossWinnerIndex;
@@ -144,28 +165,25 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const bowlingTeam = match.teams[bowlingFirstIndex];
     
     match.currentBatsmen = { striker: battingTeam.players[0], nonStriker: battingTeam.players[1] };
-    match.currentBowler = bowlingTeam.players[10];
+    match.currentBowler = bowlingTeam.players[bowlingTeam.players.length - 1];
 
     updateLiveMatchInState(match);
   };
 
   const _updateScore = (runs: number, isWicket: boolean, isExtra: boolean, isLegalBall: boolean) => {
-    if(!appData.liveMatch) return;
-    let match = { ...appData.liveMatch };
+    if(!liveMatch) return;
+    let match = { ...liveMatch };
     const currentInningData = match.scorecard![`inning${match.currentInning}` as 'inning1' | 'inning2'];
     const currentBattingTeam = match.teams.find(t => t.name === currentInningData.team)!;
     
-    // Update runs
     currentBattingTeam.runs += runs;
     if(isExtra) currentInningData.extraRuns += runs;
 
-    // Update bowler stats
     if(match.currentBowler){
         const bowlerStats = currentInningData.bowlers[match.currentBowler.id] ||= {playerId: match.currentBowler.id, runs: 0, overs: 0, wickets: 0};
         bowlerStats.runs += runs;
     }
 
-    // Update batsman stats if it's not a wide
     if(match.currentBatsmen.striker && !isExtra) {
         const batsmanStats = currentInningData.batsmen[match.currentBatsmen.striker.id] ||= {playerId: match.currentBatsmen.striker.id, runs: 0, balls: 0, fours: 0, sixes: 0, out: false};
         batsmanStats.runs += runs;
@@ -189,6 +207,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }
         if(match.currentBatsmen.striker) {
              currentInningData.batsmen[match.currentBatsmen.striker.id].out = true;
+             const nextBatsmanIndex = currentBattingTeam.players.findIndex(p => p.id === match.currentBatsmen.striker!.id) + 1; // Simplistic
              const nextBatsman = currentBattingTeam.players.find(p => !currentInningData.batsmen[p.id]?.out && p.id !== match.currentBatsmen.nonStriker?.id);
              match.currentBatsmen.striker = nextBatsman || null;
         }
@@ -197,7 +216,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
     
     if (match.ballsInOver === 6) {
-        // complete over
         match.currentOver += 1;
         currentBattingTeam.overs = Math.floor(match.currentOver) + (match.ballsInOver/10);
         if(match.currentBowler) {
@@ -207,10 +225,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         match.ballsInOver = 0;
         [match.currentBatsmen.striker, match.currentBatsmen.nonStriker] = [match.currentBatsmen.nonStriker, match.currentBatsmen.striker];
         
-        // change bowler
         const bowlingTeam = match.teams.find(t => t.name !== currentInningData.team)!;
         const currentBowlerIndex = bowlingTeam.players.findIndex(p => p.id === match.currentBowler?.id);
-        const nextBowlerIndex = (currentBowlerIndex + 1) % bowlingTeam.players.length; // simple logic for now
+        const nextBowlerIndex = (currentBowlerIndex - 1 + bowlingTeam.players.length) % bowlingTeam.players.length; 
         match.currentBowler = bowlingTeam.players[nextBowlerIndex];
     } else {
         currentBattingTeam.overs = match.currentOver + (match.ballsInOver * 0.1);
@@ -220,7 +237,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }
     }
 
-    if (currentBattingTeam.wickets === 10 || currentBattingTeam.overs >= match.overs) {
+    if (currentBattingTeam.wickets === (currentBattingTeam.players.length - 1) || currentBattingTeam.overs >= match.overs) {
         endInning();
     } else {
         updateLiveMatchInState(match);
@@ -232,10 +249,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const scoreExtra = (type: 'Wide' | 'No Ball') => _updateScore(1, false, true, type === 'No Ball');
 
   const endInning = () => {
-    if(!appData.liveMatch) return;
-    let match = { ...appData.liveMatch };
+    if(!liveMatch) return;
+    let match = { ...liveMatch };
     
-    match.teams.find(t => t.name === match.scorecard![`inning${match.currentInning}` as 'inning1' | 'inning2'].team)!.inningCompleted = true;
+    const currentInningLabel = `inning${match.currentInning}` as 'inning1' | 'inning2';
+    const currentInningTeamName = match.scorecard![currentInningLabel].team;
+    match.teams.find(t => t.name === currentInningTeamName)!.inningCompleted = true;
+    
     match.ballsInOver = 0;
     match.currentOver = 0;
 
@@ -244,64 +264,47 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const battingTeam = match.teams.find(t => t.name === match.scorecard!.inning2.team)!;
         const bowlingTeam = match.teams.find(t => t.name !== match.scorecard!.inning2.team)!;
         match.currentBatsmen = { striker: battingTeam.players[0], nonStriker: battingTeam.players[1] };
-        match.currentBowler = bowlingTeam.players[10];
+        match.currentBowler = bowlingTeam.players[bowlingTeam.players.length - 1];
         updateLiveMatchInState(match);
     } else {
         endMatch();
     }
   }
 
-  const endMatch = () => {
-    if(!appData.liveMatch) return;
-    let match = { ...appData.liveMatch };
+  const endMatch = async () => {
+    if(!liveMatch) return;
+    let match: Match = { ...liveMatch };
     const team1 = match.teams[0];
     const team2 = match.teams[1];
 
     if (team1.runs > team2.runs) {
         match.result = `${team1.name} won by ${team1.runs - team2.runs} runs`;
     } else if (team2.runs > team1.runs) {
-        const wicketsLeft = 10 - team2.wickets;
+        const wicketsLeft = team2.players.length - 1 - team2.wickets;
         match.result = `${team2.name} won by ${wicketsLeft} wickets`;
     } else {
         match.result = "Match Tied";
     }
     match.status = 'completed';
-    
-    // player of the match
-    // ... logic needed
 
-    const finalMatchData: Match = { ...match };
-    const updatedMatches = appData.matches.map(m => m.id === finalMatchData.id ? finalMatchData : m);
-    setAppData(prev => ({...prev, matches: updatedMatches, liveMatch: null}));
+    const matchRef = doc(db, "matches", match.id as string);
+    await updateDoc(matchRef, { ...match });
+    setLiveMatch(null);
   };
 
   const calculateRankings = () => {
-        const playersWithStats = appData.players.filter(p => p.stats.matches > 0);
-
-        const bestBatsmen = [...playersWithStats]
-            .sort((a, b) => b.stats.runs - a.stats.runs)
-            .slice(0, 5);
-
-        const bestBowlers = [...playersWithStats]
-            .sort((a, b) => b.stats.wickets - a.stats.wickets)
-            .slice(0, 5);
-
-        const bestAllrounders = [...playersWithStats]
-            .sort((a, b) => {
-                const scoreA = a.stats.runs * 0.4 + a.stats.wickets * 20;
-                const scoreB = b.stats.runs * 0.4 + b.stats.wickets * 20;
-                return scoreB - scoreA;
-            })
-            .slice(0, 5);
-
+        const playersWithStats = players.filter(p => p.stats.matches > 0);
+        const bestBatsmen = [...playersWithStats].sort((a, b) => b.stats.runs - a.stats.runs).slice(0, 5);
+        const bestBowlers = [...playersWithStats].sort((a, b) => b.stats.wickets - a.stats.wickets).slice(0, 5);
+        const bestAllrounders = [...playersWithStats].sort((a, b) => (b.stats.runs * 0.4 + b.stats.wickets * 20) - (a.stats.runs * 0.4 + a.stats.wickets * 20)).slice(0, 5);
         return { bestBatsmen, bestBowlers, bestAllrounders };
   }
   
-  const startAuction = (tournamentId: number) => {
-    const tournament = appData.tournaments.find(t => t.id === tournamentId);
+  const startAuction = (tournamentId: string) => {
+    const tournament = tournaments.find(t => t.id === tournamentId);
     if (!tournament) return;
 
-    const playersForAuction: AuctionPlayer[] = appData.players.map(p => ({
+    const playersForAuction: AuctionPlayer[] = players.map(p => ({
         ...p,
         status: 'Unsold',
         bidder: null,
@@ -314,27 +317,22 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         players: playersForAuction,
         teams: []
     };
-
-    setAppData(prev => ({...prev, auction: newAuction}));
+    setAuction(newAuction);
   };
   
   const placeBid = (playerId: number, bidAmount: number, teamName: string) => {
-    if (!appData.auction) return false;
+    if (!auction) return false;
 
-    const auction = { ...appData.auction };
-    const playerIndex = auction.players.findIndex(p => p.id === playerId);
-    if (playerIndex === -1) return false;
+    const newAuction = { ...auction };
+    const playerIndex = newAuction.players.findIndex(p => p.id === playerId);
+    if (playerIndex === -1 || bidAmount <= newAuction.players[playerIndex].bidAmount) return false;
 
-    const player = auction.players[playerIndex];
-    if (bidAmount <= player.bidAmount) return false;
-
-    player.bidAmount = bidAmount;
-    player.bidder = teamName;
-    player.status = 'Sold';
-
-    setAppData(prev => ({...prev, auction}));
+    newAuction.players[playerIndex] = { ...newAuction.players[playerIndex], bidAmount, bidder: teamName, status: 'Sold' };
+    setAuction(newAuction);
     return true;
   };
+  
+  const appData = { isAdmin, players, matches, tournaments, liveMatch, auction };
 
   return (
     <AppContext.Provider value={{ ...appData, login, logout, addPlayer, scheduleMatch, scheduleTournament, deleteTournament, startScoringMatch, performToss, selectTossOption, scoreRun, scoreWicket, scoreExtra, endMatch, calculateRankings, updateLiveMatchInState, startAuction, placeBid }}>
