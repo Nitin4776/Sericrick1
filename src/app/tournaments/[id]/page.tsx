@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAppContext } from "@/context/app-context";
-import type { Player, Match, PointsTableEntry } from "@/lib/types";
+import type { Player, Match, PointsTableEntry, Tournament } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ScorecardDialog } from "@/components/matches/scorecard-dialog";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+
+export async function generateStaticParams() {
+    const tournamentsCollection = collection(db, 'tournaments');
+    const tournamentSnapshot = await getDocs(tournamentsCollection);
+    const tournaments = tournamentSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tournament));
+    
+    return tournaments.map((tournament) => ({
+      id: tournament.id,
+    }));
+}
 
 
 const createTeamSchema = (playersPerTeam: number) => z.object({
