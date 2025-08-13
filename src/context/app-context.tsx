@@ -123,7 +123,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (!match) return;
 
     const liveMatchData: LiveMatch = {
-      ...JSON.parse(JSON.stringify(match)),
+      ...JSON.parse(JSON.stringify(match)), // Deep copy to avoid mutation issues
       status: 'live',
       scorecard: {
         inning1: { team: null, batsmen: {}, bowlers: {}, extraRuns: 0 },
