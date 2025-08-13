@@ -71,6 +71,7 @@ export interface Match {
   result: string | null;
   playerOfTheMatch: string | null;
   scorecard: Scorecard | null;
+  tournamentId?: string;
 }
 
 export interface LiveMatch extends Match {
@@ -93,17 +94,25 @@ export interface TeamInTournament {
     playerIds: string[];
 }
 
+export type TournamentFormat = 
+  | 'Series (2 Teams)'
+  | 'Round Robin'
+  | 'Group Stage + Knockout'
+  | 'Knockout'
+  | 'League Table';
+
 export interface Tournament {
   id: number | string;
   name: string;
   venue: string;
   description: string;
-  format: 'Knockout' | 'Round Robin' | 'Group + Knockout';
+  format: TournamentFormat;
   dates: {
     start: string;
     end: string;
   };
   teams: TeamInTournament[];
+  scheduledMatches?: string[]; // IDs of matches scheduled for this tournament
   status: 'scheduled' | 'ongoing' | 'completed';
 }
 

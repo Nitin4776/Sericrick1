@@ -12,6 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { AdminGate } from "../admin-gate";
+import type { TournamentFormat } from "@/lib/types";
 
 const tournamentSchema = z.object({
   name: z.string().min(3, "Tournament name is required."),
@@ -19,10 +20,18 @@ const tournamentSchema = z.object({
   startDate: z.string().min(1, "Start date is required"),
   endDate: z.string().min(1, "End date is required"),
   description: z.string().optional(),
-  format: z.enum(["Knockout", "Round Robin", "Group + Knockout"]),
+  format: z.enum(["Series (2 Teams)", "Round Robin", "Group Stage + Knockout", "Knockout", "League Table"]),
 });
 
 type TournamentFormValues = z.infer<typeof tournamentSchema>;
+
+const formats: TournamentFormat[] = [
+    "Series (2 Teams)",
+    "Round Robin",
+    "Group Stage + Knockout",
+    "Knockout",
+    "League Table",
+];
 
 export function TournamentForm() {
   const { scheduleTournament } = useAppContext();
@@ -119,9 +128,9 @@ export function TournamentForm() {
                      <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl><SelectTrigger><SelectValue placeholder="Select format" /></SelectTrigger></FormControl>
                       <SelectContent>
-                        <SelectItem value="Knockout">Knockout</SelectItem>
-                        <SelectItem value="Round Robin">Round Robin</SelectItem>
-                        <SelectItem value="Group + Knockout">Group + Knockout</SelectItem>
+                        {formats.map(format => (
+                            <SelectItem key={format} value={format}>{format}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
