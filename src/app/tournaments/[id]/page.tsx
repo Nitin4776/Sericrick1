@@ -16,10 +16,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Users, Calendar, MapPin, Trophy, PlusCircle, ArrowLeft, BarChart2, Play, StopCircle, Swords, Award } from "lucide-react";
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { ScorecardDialog } from "@/components/matches/scorecard-dialog";
 
 
 const createTeamSchema = (playersPerTeam: number) => z.object({
@@ -84,7 +85,6 @@ function TournamentResult({ tournament, pointsTable, allPlayers, allMatches }: {
     }
 
     const winner = pointsTable[0];
-    // A simple way to determine player of the tournament
     const tournamentMatches = tournament.scheduledMatches || [];
     const playerStats: { [playerId: string]: { runs: number, wickets: number, name: string } } = {};
 
@@ -136,7 +136,7 @@ function TournamentResult({ tournament, pointsTable, allPlayers, allMatches }: {
     )
 }
 
-function ScheduledMatches({ tournament, allMatches }: { tournament: any, allMatches: Match[] }) {
+function ScheduledMatches({ tournament, allMatches, onViewScorecard }: { tournament: any, allMatches: Match[], onViewScorecard: (match: Match) => void }) {
     const tournamentMatches = allMatches.filter(m => m.tournamentId === tournament.id);
 
     if (tournament.status === 'scheduled') {
@@ -177,7 +177,12 @@ function ScheduledMatches({ tournament, allMatches }: { tournament: any, allMatc
                             <p className="font-semibold">{match.teams[0].name} vs {match.teams[1].name}</p>
                             <p className="text-sm text-muted-foreground">{match.venue}</p>
                         </div>
-                        <Badge variant={match.status === 'completed' ? 'secondary' : 'default'}>{match.status}</Badge>
+                        <div className="flex items-center gap-2">
+                            <Badge variant={match.status === 'completed' ? 'secondary' : 'default'} className="capitalize">{match.status}</Badge>
+                            {match.status === 'completed' && (
+                                <Button size="sm" variant="outline" onClick={() => onViewScorecard(match)}>View Scorecard</Button>
+                            )}
+                        </div>
                     </div>
                 ))}
             </CardContent>
@@ -190,6 +195,9 @@ export default function TournamentDetailPage() {
   const router = useRouter();
   const { tournaments, players, matches, registerTeamForTournament, isAdmin, startTournament, closeTournament, calculatePointsTable } = useAppContext();
   const { toast } = useToast();
+
+  const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
+  const [isScorecardOpen, setScorecardOpen] = useState(false);
 
   const tournament = tournaments.find(t => t.id === id);
 
@@ -210,6 +218,15 @@ export default function TournamentDetailPage() {
       playerIds: [],
     },
   });
+  
+  const handleViewScorecard = (match: Match) => {
+    if (!match.scorecard) {
+        toast({ title: "No Scorecard", description: "Scorecard is not available for this match.", variant: "destructive"});
+        return;
+    }
+    setSelectedMatch(match);
+    setScorecardOpen(true);
+  };
 
   const onSubmit = async (data: TeamFormValues) => {
     if (!tournament) return;
@@ -395,7 +412,7 @@ export default function TournamentDetailPage() {
             </TabsContent>
             <TabsContent value="matches">
                 <div className="mt-6">
-                    <ScheduledMatches tournament={tournament} allMatches={matches} />
+                    <ScheduledMatches tournament={tournament} allMatches={matches} onViewScorecard={handleViewScorecard} />
                 </div>
             </TabsContent>
             <TabsContent value="points">
@@ -404,6 +421,9 @@ export default function TournamentDetailPage() {
                  </div>
             </TabsContent>
         </Tabs>
+        <ScorecardDialog match={selectedMatch} isOpen={isScorecardOpen} onOpenChange={setScorecardOpen} />
     </div>
   );
 }
+
+    
