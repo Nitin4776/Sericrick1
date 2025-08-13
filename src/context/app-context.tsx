@@ -293,7 +293,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const calculateRankings = () => {
-        const playersWithStats = players.filter(p => p.stats.matches > 0);
+        const playersWithStats = players.filter(p => p.stats && p.stats.matches > 0);
         const bestBatsmen = [...playersWithStats].sort((a, b) => b.stats.runs - a.stats.runs).slice(0, 5);
         const bestBowlers = [...playersWithStats].sort((a, b) => b.stats.wickets - a.stats.wickets).slice(0, 5);
         const bestAllrounders = [...playersWithStats].sort((a, b) => (b.stats.runs * 0.4 + b.stats.wickets * 20) - (a.stats.runs * 0.4 + a.stats.wickets * 20)).slice(0, 5);
