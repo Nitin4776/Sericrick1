@@ -205,7 +205,7 @@ export function Header() {
                 <DialogContent className="sm:max-w-[625px]">
                   <DialogHeader>
                     <DialogTitle>About SeriCrick</DialogTitle>
-                     <DialogDescription>
+                    <DialogDescription>
                        A feature-rich cricket management and live scoring app designed for passionate and serious cricketers.
                     </DialogDescription>
                   </DialogHeader>
