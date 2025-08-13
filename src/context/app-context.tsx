@@ -62,7 +62,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       setPlayers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Player)));
     });
     const unsubMatches = onSnapshot(query(collection(db, "matches")), (snapshot) => {
-        setMatches(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Match)).sort((a,b) => (a.id as number) - (b.id as number) ));
+        setMatches(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Match)).sort((a,b) => String(a.id).localeCompare(String(b.id))));
     });
     const unsubTournaments = onSnapshot(collection(db, "tournaments"), (snapshot) => {
       setTournaments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Tournament)));
@@ -115,14 +115,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const scheduleMatch = async (matchData: Omit<Match, 'id' | 'status' | 'result' | 'playerOfTheMatch' | 'scorecard'>) => {
+    const docRef = await addDoc(collection(db, "matches"), {});
     const newMatch: Omit<Match, 'id'> = {
       ...matchData,
+      id: docRef.id,
       status: 'scheduled',
       result: null,
       playerOfTheMatch: null,
       scorecard: null,
     };
-    await addDoc(collection(db, "matches"), newMatch);
+    await updateDoc(docRef, newMatch);
   };
 
   const deleteMatch = async (matchId: string) => {
@@ -216,7 +218,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 playerOfTheMatch: null,
                 scorecard: null,
                 tournamentId: tournament.id,
-                id: (new Date().getTime() + i).toString(),
+                id: matchRef.id,
             });
             scheduledMatchIds.push(matchRef.id);
         }
@@ -237,7 +239,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                     playerOfTheMatch: null,
                     scorecard: null,
                     tournamentId: tournament.id,
-                    id: (new Date().getTime() + i + j).toString(),
+                    id: matchRef.id,
                 });
                 scheduledMatchIds.push(matchRef.id);
             }
@@ -273,6 +275,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   
     const liveMatchData: LiveMatch = {
       ...JSON.parse(JSON.stringify(match)),
+      id: String(match.id),
       teams: [
         { ...match.teams[0], players: team1Players },
         { ...match.teams[1], players: team2Players }
@@ -352,9 +355,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       match.overEvents = [];
     }
     
-    if (!match.overEvents) {
-      match.overEvents = [];
-    }
+    const currentInningData = match.scorecard![`inning${match.currentInning}` as 'inning1' | 'inning2'];
+    const currentBattingTeam = match.teams.find(t => t.name === currentInningData.team)!;
 
     let event = isWicket ? 'W' : `${runs}`;
     if (isExtra) event += 'wd'; // simplified for now
@@ -617,7 +619,3 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
-
-    
-
-    
