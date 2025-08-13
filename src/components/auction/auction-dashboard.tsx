@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "../ui/skeleton";
 
 export function AuctionDashboard() {
-  const { tournaments, auction, startAuction, placeBid } = useAppContext();
+  const { tournaments, matches, auction, startAuction, placeBid } = useAppContext();
   const [selectedTournamentId, setSelectedTournamentId] = useState<string>('');
   const { toast } = useToast();
   const [isClient, setIsClient] = useState(false);
@@ -21,6 +21,17 @@ export function AuctionDashboard() {
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  const availableTournamentsForAuction = tournaments.filter(t => {
+    // Auction can only happen for ongoing tournaments
+    if (t.status !== 'ongoing') return false;
+    
+    // Check if any match for this tournament has started (is live or completed)
+    const hasMatchStarted = matches.some(m => m.tournamentId === t.id && (m.status === 'live' || m.status === 'completed'));
+    
+    // If a match has started, it's not available for auction
+    return !hasMatchStarted;
+  });
 
 
   const handleStartAuction = () => {
@@ -70,19 +81,19 @@ export function AuctionDashboard() {
       <Card className="max-w-2xl mx-auto">
         <CardHeader>
           <CardTitle>Setup Player Auction</CardTitle>
-          <CardDescription>Select a tournament to start the player auction.</CardDescription>
+          <CardDescription>Select an ongoing tournament to start the player auction. Auctions can only be started before the first match begins.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Select value={selectedTournamentId} onValueChange={setSelectedTournamentId}>
             <SelectTrigger><SelectValue placeholder="Select a tournament..." /></SelectTrigger>
             <SelectContent>
-              {tournaments.map(t => (
+              {availableTournamentsForAuction.map(t => (
                 <SelectItem key={t.id as string} value={t.id.toString()}>{t.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
           <Button onClick={handleStartAuction} disabled={!selectedTournamentId}>Start Auction</Button>
-          {tournaments.length === 0 && <p className="text-sm text-muted-foreground">No tournaments available to start an auction.</p>}
+          {availableTournamentsForAuction.length === 0 && <p className="text-sm text-muted-foreground">No ongoing tournaments are available for an auction.</p>}
         </CardContent>
       </Card>
     );
