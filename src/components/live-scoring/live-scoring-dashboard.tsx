@@ -227,6 +227,7 @@ export function LiveScoringDashboard() {
   const inningStarted = !!currentInningData?.team;
   const isMatchStarting = !inningStarted;
   const isInningStarting = inningStarted && !arePlayersSet && !isWicketFallen && !isOverFinished;
+  const overEvents = liveMatch.overEvents || [];
 
   const renderContent = () => {
     if (isMatchStarting) {
@@ -282,7 +283,7 @@ export function LiveScoringDashboard() {
                     <div>
                         <Label>This Over</Label>
                         <div className="flex flex-wrap gap-2 mt-2">
-                            {liveMatch.overEvents.length > 0 ? liveMatch.overEvents.map((event, i) => (
+                            {overEvents.length > 0 ? overEvents.map((event, i) => (
                                 <Badge key={i} variant={event === 'W' ? 'destructive' : 'secondary'} className="text-lg">{event}</Badge>
                             )) : <p className="text-sm text-muted-foreground">First ball of the over.</p>}
                         </div>
@@ -364,4 +365,3 @@ export function LiveScoringDashboard() {
     </div>
   );
 }
-
