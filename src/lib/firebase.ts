@@ -5,14 +5,13 @@ import { getFirestore } from "firebase/firestore";
 // https://firebase.google.com/docs/web/setup#available-libraries
 
 // Your web app's Firebase configuration
-// IMPORTANT: Replace with your project's Firebase credentials
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyCJUTQ6qDpKXN6LYTGbyt4u7Ixdk8wmqP8",
+  authDomain: "cricklive-tb354.firebaseapp.com",
+  projectId: "cricklive-tb354",
+  storageBucket: "cricklive-tb354.appspot.com",
+  messagingSenderId: "290919398005",
+  appId: "1:290919398005:web:2b6195652728a57a4c563c"
 };
 
 // Initialize Firebase
