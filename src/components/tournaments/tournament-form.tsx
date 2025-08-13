@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useForm } from "react-hook-form";
@@ -55,6 +56,7 @@ export function TournamentForm() {
       endDate: "",
       description: "",
       format: "Knockout",
+      numberOfMatches: undefined,
     },
   });
 
@@ -157,7 +159,7 @@ export function TournamentForm() {
                     render={({ field }) => (
                         <FormItem>
                         <FormLabel>Number of Matches</FormLabel>
-                        <FormControl><Input type="number" placeholder="e.g. 3" {...field} /></FormControl>
+                        <FormControl><Input type="number" placeholder="e.g. 3" {...field} value={field.value ?? ''} /></FormControl>
                         <FormMessage />
                         </FormItem>
                     )}
