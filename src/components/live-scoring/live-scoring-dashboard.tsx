@@ -9,13 +9,16 @@ import { useEffect, useState } from "react";
 import type { Match } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Coins } from "lucide-react";
+import { Skeleton } from "../ui/skeleton";
 
 export function LiveScoringDashboard() {
-  const { matches, liveMatch, startScoringMatch, updateLiveMatchInState, performToss, selectTossOption, scoreRun, scoreWicket, scoreExtra, endMatch } = useAppContext();
+  const { matches, liveMatch, startScoringMatch, performToss, selectTossOption, scoreRun, scoreWicket, scoreExtra, endMatch } = useAppContext();
   const router = useRouter();
   const [selectedMatchId, setSelectedMatchId] = useState<string>('');
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
+    setIsClient(true);
     if (liveMatch) {
       setSelectedMatchId(liveMatch.id.toString());
     }
@@ -28,6 +31,21 @@ export function LiveScoringDashboard() {
   };
   
   const scheduledMatches = matches.filter(m => m.status === 'scheduled');
+
+  if (!isClient) {
+    return (
+        <Card className="max-w-2xl mx-auto">
+            <CardHeader>
+                <Skeleton className="h-8 w-48" />
+                <Skeleton className="h-4 w-64" />
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-32" />
+            </CardContent>
+        </Card>
+    );
+  }
 
   if (!liveMatch) {
     return (
@@ -54,8 +72,6 @@ export function LiveScoringDashboard() {
     );
   }
 
-  const battingTeam = liveMatch.teams.find(t => t.name === liveMatch.scorecard?.inning1.team);
-  
   return (
     <div className="space-y-6">
         <Card>
