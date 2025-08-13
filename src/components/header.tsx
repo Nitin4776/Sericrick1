@@ -1,8 +1,9 @@
+
 "use client";
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LogOut, ShieldCheck, User, Menu } from 'lucide-react';
+import { LogOut, ShieldCheck, User, Menu, Info } from 'lucide-react';
 import { useAppContext } from '@/context/app-context';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -19,10 +20,19 @@ import {
   SheetContent,
   SheetTrigger,
 } from "@/components/ui/sheet"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import { useState, useEffect } from 'react';
 import { Separator } from './ui/separator';
 import { Skeleton } from './ui/skeleton';
 import Image from 'next/image';
+import { ScrollArea } from './ui/scroll-area';
 
 const navLinks = [
   { href: '/', label: 'Home' },
@@ -30,6 +40,60 @@ const navLinks = [
   { href: '/tournaments', label: 'Tournaments' },
   { href: '/players', label: 'Players' },
 ];
+
+function AboutDialog() {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="ghost" className="text-muted-foreground hover:text-primary">About</Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[625px]">
+        <DialogHeader>
+          <DialogTitle>About SeriCrick</DialogTitle>
+          <DialogDescription>
+             A feature-rich cricket management and live scoring app designed for passionate and serious cricketers.
+          </DialogDescription>
+        </DialogHeader>
+        <ScrollArea className="h-[60vh] pr-6">
+          <div className="space-y-4 text-sm text-muted-foreground">
+            <p>
+              It’s not just another cricket app — SeriCrick brings local tournaments, players, and matches to life with professional-level tracking, real-time updates, and an engaging user experience.
+            </p>
+            <p>
+              Whether you’re a player wanting to showcase your stats, a team manager organizing matches, or a fan following live games, SeriCrick has everything in one place:
+            </p>
+            <ul className="space-y-3 list-disc list-inside">
+                <li>
+                    <span className="font-semibold text-foreground">Players Hub</span> – Register as a player, track your career stats, and see your ranking as a batsman, bowler, or all-rounder.
+                </li>
+                 <li>
+                    <span className="font-semibold text-foreground">Matches</span> – View matches by status (Live, Scheduled, Completed), check detailed scoreboards, and celebrate the Player of the Match.
+                </li>
+                 <li>
+                    <span className="font-semibold text-foreground">Tournaments</span> – Organize or join tournaments with multiple formats, auto-scheduled fixtures, and a Player of the Tournament leaderboard.
+                </li>
+                <li>
+                    <span className="font-semibold text-foreground">Live Scoring</span> – Enjoy ball-by-ball live updates with intelligent features like automated strike changes, real-time notifications, and instant match results.
+                </li>
+                 <li>
+                    <span className="font-semibold text-foreground">Player Auction</span> – Host exciting auctions for registered players, create teams, and bring competitive spirit to your tournaments.
+                </li>
+            </ul>
+             <p>
+              SeriCrick empowers cricket enthusiasts at every level — from local gully cricket to community tournaments — with professional tools and a smooth, intuitive interface.
+            </p>
+            <div>
+              <p className="font-semibold text-foreground">Developed by:</p>
+              <p>Nitin Choudhary</p>
+              <p>📧 Email: nchaudhary.836@gmail.com</p>
+              <p>💬 Need help with Android or Web App Development? Feel free to reach out — happy to collaborate and assist!</p>
+            </div>
+          </div>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
+  )
+}
 
 export function Header() {
   const { isAdmin, logout } = useAppContext();
@@ -74,6 +138,7 @@ export function Header() {
             <Link href={link.href}>{link.label}</Link>
           </Button>
         ))}
+        <AboutDialog />
       </nav>
 
       {/* Admin Actions */}
@@ -133,6 +198,55 @@ export function Header() {
                   {link.label}
                 </Link>
               ))}
+               <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" className="text-muted-foreground justify-start p-0 h-auto font-medium">About</Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[625px]">
+                  <DialogHeader>
+                    <DialogTitle>About SeriCrick</DialogTitle>
+                     <DialogDescription>
+                       A feature-rich cricket management and live scoring app designed for passionate and serious cricketers.
+                    </DialogDescription>
+                  </DialogHeader>
+                   <ScrollArea className="h-[60vh] pr-6">
+                    <div className="space-y-4 text-sm text-muted-foreground">
+                      <p>
+                        It’s not just another cricket app — SeriCrick brings local tournaments, players, and matches to life with professional-level tracking, real-time updates, and an engaging user experience.
+                      </p>
+                      <p>
+                        Whether you’re a player wanting to showcase your stats, a team manager organizing matches, or a fan following live games, SeriCrick has everything in one place:
+                      </p>
+                       <ul className="space-y-3 list-disc list-inside">
+                          <li>
+                              <span className="font-semibold text-foreground">Players Hub</span> – Register as a player, track your career stats, and see your ranking as a batsman, bowler, or all-rounder.
+                          </li>
+                           <li>
+                              <span className="font-semibold text-foreground">Matches</span> – View matches by status (Live, Scheduled, Completed), check detailed scoreboards, and celebrate the Player of the Match.
+                          </li>
+                           <li>
+                              <span className="font-semibold text-foreground">Tournaments</span> – Organize or join tournaments with multiple formats, auto-scheduled fixtures, and a Player of the Tournament leaderboard.
+                          </li>
+                          <li>
+                              <span className="font-semibold text-foreground">Live Scoring</span> – Enjoy ball-by-ball live updates with intelligent features like automated strike changes, real-time notifications, and instant match results.
+                          </li>
+                           <li>
+                              <span className="font-semibold text-foreground">Player Auction</span> – Host exciting auctions for registered players, create teams, and bring competitive spirit to your tournaments.
+                          </li>
+                      </ul>
+                       <p>
+                        SeriCrick empowers cricket enthusiasts at every level — from local gully cricket to community tournaments — with professional tools and a smooth, intuitive interface.
+                      </p>
+                      <div>
+                        <p className="font-semibold text-foreground">Developed by:</p>
+                        <p>Nitin Choudhary</p>
+                        <p>📧 Email: nchaudhary.836@gmail.com</p>
+                        <p>💬 Need help with Android or Web App Development? Feel free to reach out — happy to collaborate and assist!</p>
+                      </div>
+                    </div>
+                  </ScrollArea>
+                </DialogContent>
+              </Dialog>
               <Separator />
                {isClient && isAdmin ? (
                  <>
