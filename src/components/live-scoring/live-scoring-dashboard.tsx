@@ -35,7 +35,8 @@ function PlayerSelector({ players, selectedPlayer, onSelect, otherSelectedPlayer
         if (!scorecard || !scorecard.bowlers[playerId]) {
             return "0.0";
         }
-        return scorecard.bowlers[playerId].overs.toFixed(1);
+        const overs = scorecard.bowlers[playerId].overs || 0;
+        return overs.toFixed(1);
     };
 
     return (
@@ -158,14 +159,14 @@ function NewBowlerSelector({ onConfirm }: { onConfirm: (bowlerId: string) => voi
 function LiveScorecard() {
     const { liveMatch, players } = useAppContext();
 
-    if (!liveMatch) return null;
+    if (!liveMatch || !liveMatch.scorecard) return null;
 
     const getPlayerName = (id: string) => players.find(p => p.id === id)?.name || 'Unknown Player';
 
     const renderInning = (inningData: ScorecardInning, inningNum: number) => {
         if (!inningData || !inningData.team) return null;
 
-        const batsmen = Object.values(inningData.batsmen).sort((a,b) => a.balls > 0 ? -1 : 1);
+        const batsmen = Object.values(inningData.batsmen).sort((a,b) => (a.balls > 0 || a.runs > 0) ? -1 : 1);
         const bowlers = Object.values(inningData.bowlers);
 
         return (
@@ -201,7 +202,7 @@ function LiveScorecard() {
                                      {bowlers.map(b => (
                                         <TableRow key={b.playerId}>
                                             <TableCell>{getPlayerName(b.playerId)}</TableCell>
-                                            <TableCell>{b.overs.toFixed(1)}</TableCell>
+                                            <TableCell>{(b.overs || 0).toFixed(1)}</TableCell>
                                             <TableCell>{b.runs}</TableCell>
                                             <TableCell>{b.wickets}</TableCell>
                                             <TableCell>{(b.overs > 0 ? b.runs / b.overs : 0).toFixed(2)}</TableCell>
@@ -311,7 +312,7 @@ export function LiveScoringDashboard() {
   
   const arePlayersSet = liveMatch.currentBatsmen.striker && liveMatch.currentBatsmen.nonStriker && liveMatch.currentBowler;
   const isWicketFallen = liveMatch.currentBatsmen.striker === null && liveMatch.currentBatsmen.nonStriker !== null;
-  const isOverFinished = liveMatch.currentBowler === null && liveMatch.ballsInOver === 0 && (liveMatch.currentOver > 0 || (liveMatch.currentOver === 0 && liveMatch.ballsInOver === 0 && currentInningData.team != null));
+  const isOverFinished = liveMatch.ballsInOver === 0 && liveMatch.currentOver > 0 && liveMatch.currentBowler === null;
   
   const inningStarted = !!currentInningData?.team;
   const isMatchStarting = !inningStarted;
@@ -415,7 +416,7 @@ export function LiveScoringDashboard() {
   }
 
   const getTeamScore = (teamName: string | null | undefined) => {
-    if (!teamName || !liveMatch?.teams) return { runs: 0, wickets: 0, overs: 0.0 };
+    if (!liveMatch?.teams || !teamName) return { runs: 0, wickets: 0, overs: '0.0' };
     const teamData = liveMatch.teams.find(t => t.name === teamName);
     return {
       runs: teamData?.runs ?? 0,
@@ -471,5 +472,3 @@ export function LiveScoringDashboard() {
     </div>
   );
 }
-
-    
