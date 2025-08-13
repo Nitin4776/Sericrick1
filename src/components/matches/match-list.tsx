@@ -9,10 +9,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScorecardDialog } from "./scorecard-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Radio, CheckCircle, Calendar, PlayCircle } from "lucide-react";
+import { Radio, CheckCircle, Calendar, PlayCircle, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export function MatchList() {
-  const { matches, isAdmin, startScoringMatch } = useAppContext();
+  const { matches, isAdmin, startScoringMatch, deleteMatch } = useAppContext();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -36,6 +47,14 @@ export function MatchList() {
     setSelectedMatch(match);
     setScorecardOpen(true);
   };
+
+  const handleDeleteMatch = (matchId: string, matchName: string) => {
+    deleteMatch(matchId);
+    toast({
+        title: "Match Deleted",
+        description: `The match "${matchName}" has been deleted.`
+    })
+  }
   
   const getStatusBadge = (status: Match['status']) => {
     switch (status) {
@@ -74,6 +93,27 @@ export function MatchList() {
                     <Button onClick={() => handleViewScorecard(m)} variant="outline" size="sm">
                         View Scorecard
                     </Button>
+                  )}
+                   {isAdmin && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="destructive" size="icon">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the match: {m.teams[0].name} vs {m.teams[1].name}.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleDeleteMatch(m.id as string, `${m.teams[0].name} vs ${m.teams[1].name}`)}>Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   )}
                 </div>
               </div>

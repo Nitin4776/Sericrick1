@@ -25,6 +25,7 @@ type AppContextType = AppData & {
   logout: () => void;
   addPlayer: (playerData: Omit<Player, 'id' | 'stats'>) => Promise<boolean>;
   scheduleMatch: (matchData: Omit<Match, 'id' | 'status' | 'result' | 'playerOfTheMatch' | 'scorecard'>) => Promise<void>;
+  deleteMatch: (matchId: string) => Promise<void>;
   scheduleTournament: (tournamentData: Omit<Tournament, 'id' | 'teams' | 'status'>) => Promise<void>;
   deleteTournament: (tournamentId: string) => Promise<void>;
   startScoringMatch: (matchId: string) => void;
@@ -117,6 +118,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       scorecard: null,
     };
     await addDoc(collection(db, "matches"), newMatch);
+  };
+
+  const deleteMatch = async (matchId: string) => {
+    await deleteDoc(doc(db, "matches", matchId));
   };
 
   const scheduleTournament = async (tournamentData: Omit<Tournament, 'id' | 'teams' | 'status'>) => {
@@ -377,6 +382,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
     }
     
+    const matchRef = doc(db, "matches", match.id as string);
+    batch.update(matchRef, { ...match, scorecard: match.scorecard, result: match.result, status: match.status });
+    
     await batch.commit();
 
     setPlayers(currentPlayers => 
@@ -386,8 +394,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         })
     );
 
-    const matchRef = doc(db, "matches", match.id as string);
-    await updateDoc(matchRef, { ...match, scorecard: match.scorecard, result: match.result, status: match.status });
     setLiveMatch(null);
   };
 
@@ -436,7 +442,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const appData = { isAdmin, players, matches, tournaments, liveMatch, auction };
 
   return (
-    <AppContext.Provider value={{ ...appData, login, logout, addPlayer, scheduleMatch, scheduleTournament, deleteTournament, startScoringMatch, performToss, selectTossOption, scoreRun, scoreWicket, scoreExtra, endMatch, calculateRankings, updateLiveMatchInState, startAuction, placeBid }}>
+    <AppContext.Provider value={{ ...appData, login, logout, addPlayer, scheduleMatch, deleteMatch, scheduleTournament, deleteTournament, startScoringMatch, performToss, selectTossOption, scoreRun, scoreWicket, scoreExtra, endMatch, calculateRankings, updateLiveMatchInState, startAuction, placeBid }}>
       {children}
     </AppContext.Provider>
   );
