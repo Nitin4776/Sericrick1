@@ -1,4 +1,5 @@
 
+
 export interface PlayerStats {
   matches: number;
   runs: number;
@@ -86,6 +87,12 @@ export interface LiveMatch extends Match {
   overEvents: string[];
 }
 
+export interface TeamInTournament {
+    id: string;
+    name: string;
+    playerIds: string[];
+}
+
 export interface Tournament {
   id: number | string;
   name: string;
@@ -96,7 +103,7 @@ export interface Tournament {
     start: string;
     end: string;
   };
-  teams: any[]; // Replace with a Team type if needed
+  teams: TeamInTournament[];
   status: 'scheduled' | 'ongoing' | 'completed';
 }
 

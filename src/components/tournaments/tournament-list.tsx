@@ -18,6 +18,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import Link from "next/link";
 
 export function TournamentList() {
   const { tournaments, isAdmin, deleteTournament } = useAppContext();
@@ -62,7 +63,9 @@ export function TournamentList() {
             )}
           </CardContent>
           <CardFooter className="flex justify-between">
-            <Button variant="outline">View Details</Button>
+            <Button asChild variant="outline">
+                <Link href={`/tournaments/${t.id}`}>View Details</Link>
+            </Button>
             {isAdmin && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>

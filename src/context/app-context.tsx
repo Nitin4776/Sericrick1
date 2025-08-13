@@ -4,8 +4,8 @@
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, where, getDocs, writeBatch, getDoc } from 'firebase/firestore';
-import type { AppData, Player, Match, Tournament, LiveMatch, AuctionPlayer, Auction, PlayerStats } from '@/lib/types';
+import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, where, getDocs, writeBatch, getDoc, arrayUnion } from 'firebase/firestore';
+import type { AppData, Player, Match, Tournament, LiveMatch, AuctionPlayer, Auction, PlayerStats, TeamInTournament } from '@/lib/types';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { toast } from '@/hooks/use-toast';
 
@@ -29,6 +29,7 @@ type AppContextType = AppData & {
   deleteMatch: (matchId: string) => Promise<void>;
   scheduleTournament: (tournamentData: Omit<Tournament, 'id' | 'teams' | 'status'>) => Promise<void>;
   deleteTournament: (tournamentId: string) => Promise<void>;
+  registerTeamForTournament: (tournamentId: string, teamData: Omit<TeamInTournament, 'id'>) => Promise<boolean>;
   startScoringMatch: (matchId: string) => void;
   leaveLiveMatch: () => void;
   performToss: () => void;
@@ -137,6 +138,33 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       status: 'scheduled',
     };
     await addDoc(collection(db, "tournaments"), newTournament);
+  };
+  
+  const registerTeamForTournament = async (tournamentId: string, teamData: Omit<TeamInTournament, 'id'>): Promise<boolean> => {
+    const tournamentRef = doc(db, "tournaments", tournamentId);
+    const tournamentDoc = await getDoc(tournamentRef);
+
+    if (!tournamentDoc.exists()) {
+      console.error("Tournament not found");
+      return false;
+    }
+    
+    const tournament = tournamentDoc.data() as Tournament;
+
+    if(tournament.teams.find(t => t.name === teamData.name)) {
+        toast({ title: "Team Exists", description: `A team with the name "${teamData.name}" is already registered.`, variant: "destructive" });
+        return false;
+    }
+
+    const newTeam = {
+        id: new Date().getTime().toString(), // simple unique id
+        ...teamData
+    }
+
+    await updateDoc(tournamentRef, {
+        teams: arrayUnion(newTeam)
+    });
+    return true;
   };
 
   const deleteTournament = async (tournamentId: string) => {
@@ -490,7 +518,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const appData = { isAdmin, players, matches, tournaments, liveMatch, auction };
 
   return (
-    <AppContext.Provider value={{ ...appData, login, logout, addPlayer, scheduleMatch, deleteMatch, scheduleTournament, deleteTournament, startScoringMatch, leaveLiveMatch, performToss, selectTossOption, scoreRun, scoreWicket, scoreExtra, endMatch, calculateRankings, updateLiveMatchInState, startAuction, placeBid, setLivePlayers }}>
+    <AppContext.Provider value={{ ...appData, login, logout, addPlayer, scheduleMatch, deleteMatch, scheduleTournament, deleteTournament, registerTeamForTournament, startScoringMatch, leaveLiveMatch, performToss, selectTossOption, scoreRun, scoreWicket, scoreExtra, endMatch, calculateRankings, updateLiveMatchInState, startAuction, placeBid, setLivePlayers }}>
       {children}
     </AppContext.Provider>
   );
