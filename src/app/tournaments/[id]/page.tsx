@@ -23,12 +23,13 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 
 
-const teamSchema = z.object({
+const createTeamSchema = (playersPerTeam: number) => z.object({
   name: z.string().min(2, "Team name is required."),
-  playerIds: z.array(z.string()).min(5, "A team must have at least 5 players."),
+  playerIds: z.array(z.string()).length(playersPerTeam, `You must select exactly ${playersPerTeam} players.`),
 });
 
-type TeamFormValues = z.infer<typeof teamSchema>;
+
+type TeamFormValues = z.infer<ReturnType<typeof createTeamSchema>>;
 
 function PointsTable({ tournament }: { tournament: any }) {
     return (
@@ -136,6 +137,11 @@ export default function TournamentDetailPage() {
 
   const tournament = tournaments.find(t => t.id === id);
 
+  const teamSchema = React.useMemo(() => {
+    return createTeamSchema(tournament?.playersPerTeam || 5);
+  }, [tournament?.playersPerTeam]);
+
+
   const form = useForm<TeamFormValues>({
     resolver: zodResolver(teamSchema),
     defaultValues: {
@@ -200,6 +206,7 @@ export default function TournamentDetailPage() {
                     <h1 className="text-4xl font-bold tracking-tight">{tournament.name}</h1>
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2 text-muted-foreground">
                         <span className="flex items-center gap-2"><Trophy /> {tournament.format}</span>
+                        <span className="flex items-center gap-2"><Users /> {tournament.playersPerTeam} players/team</span>
                         <span className="flex items-center gap-2"><MapPin /> {tournament.venue}</span>
                         <span className="flex items-center gap-2"><Calendar /> {new Date(tournament.dates.start).toLocaleDateString()} - {new Date(tournament.dates.end).toLocaleDateString()}</span>
                         <Badge variant={tournament.status === 'completed' ? 'secondary' : 'default'} className="capitalize">{tournament.status}</Badge>

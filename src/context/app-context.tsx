@@ -140,7 +140,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return;
     }
     setMatches(prevMatches => prevMatches.filter(match => match.id !== matchId));
-    await deleteDoc(doc(db, "matches", String(matchId)));
+    await deleteDoc(doc(db, "matches", matchId));
   };
 
   const scheduleTournament = async (tournamentData: Omit<Tournament, 'id' | 'teams' | 'status' | 'scheduledMatches'>) => {
@@ -287,7 +287,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   
     const liveMatchData: LiveMatch = {
       ...JSON.parse(JSON.stringify(match)),
-      id: String(matchId),
+      id: matchId,
       teams: [
         { ...match.teams[0], players: team1Players },
         { ...match.teams[1], players: team2Players }
@@ -504,7 +504,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const endMatch = async (reason?: string) => {
     if(!liveMatch) return;
 
-    const matchRef = doc(db, "matches", String(liveMatch.id));
+    const matchRef = doc(db, "matches", liveMatch.id);
     const matchDoc = await getDoc(matchRef);
 
     if (!matchDoc.exists()) {
@@ -544,7 +544,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     for (const playerId of allPlayerIdsInMatch) {
       const player = players.find(p => p.id === playerId);
       if (player) {
-        const playerRef = doc(db, "players", playerId as string);
+        const playerRef = doc(db, "players", playerId);
         
         let runsScored = 0, ballsFaced = 0, wicketsTaken = 0, runsConceded = 0, oversBowled = 0;
         let isOut = false;
@@ -642,7 +642,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }));
 
     const newAuction: Auction = {
-        tournamentId: String(tournamentId),
+        tournamentId: tournamentId,
         tournamentName: tournament.name,
         players: playersForAuction,
         teams: []

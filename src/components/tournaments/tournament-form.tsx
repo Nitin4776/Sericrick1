@@ -19,6 +19,7 @@ const tournamentSchema = z.object({
   name: z.string().min(3, "Tournament name is required."),
   venue: z.string().min(3, "Venue is required."),
   overs: z.coerce.number().min(1, "Overs must be at least 1."),
+  playersPerTeam: z.coerce.number().min(2, "Each team must have at least 2 players."),
   startDate: z.string().min(1, "Start date is required"),
   endDate: z.string().min(1, "End date is required"),
   description: z.string().optional(),
@@ -54,6 +55,7 @@ export function TournamentForm() {
       name: "",
       venue: "",
       overs: 8,
+      playersPerTeam: 5,
       startDate: "",
       endDate: "",
       description: "",
@@ -69,6 +71,7 @@ export function TournamentForm() {
       name: data.name,
       venue: data.venue,
       overs: data.overs,
+      playersPerTeam: data.playersPerTeam,
       dates: { start: data.startDate, end: data.endDate },
       description: data.description || "",
       format: data.format,
@@ -144,6 +147,17 @@ export function TournamentForm() {
                       <FormItem>
                         <FormLabel>Overs per Match</FormLabel>
                         <FormControl><Input type="number" placeholder="e.g. 20" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="playersPerTeam"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Players per Team</FormLabel>
+                        <FormControl><Input type="number" placeholder="e.g. 5" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )}

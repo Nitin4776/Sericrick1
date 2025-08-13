@@ -78,7 +78,6 @@ export interface Match {
 }
 
 export interface LiveMatch extends Match {
-  id: string;
   tossWinner?: number;
   currentInning: 1 | 2;
   currentBatsmen: {
@@ -111,6 +110,7 @@ export interface Tournament {
   venue: string;
   description: string;
   overs: number;
+  playersPerTeam: number;
   format: TournamentFormat;
   numberOfMatches?: number;
   dates: {
