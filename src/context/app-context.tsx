@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, where, getDocs, writeBatch, getDoc, arrayUnion } from 'firebase/firestore';
-import type { AppData, Player, Match, Tournament, LiveMatch, AuctionPlayer, Auction, PlayerStats, TeamInTournament, TeamInMatch, ScorecardInning, PointsTableEntry } from '@/lib/types';
+import type { AppData, Player, Match, Tournament, LiveMatch, AuctionPlayer, Auction, PlayerStats, TeamInTournament, TeamInMatch, ScorecardInning, PointsTableEntry, BatsmanStatus } from '@/lib/types';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
 
@@ -39,6 +39,8 @@ type AppContextType = AppData & {
   scoreRun: (runs: number, isDeclared?: boolean) => void;
   scoreWicket: () => void;
   scoreExtra: (type: 'Wide' | 'No Ball') => void;
+  handleRunOut: (batsmanOut: 'striker' | 'non-striker', runsCompleted: number) => void;
+  handleRetire: (batsmanRetired: 'striker' | 'non-striker') => void;
   endMatch: (reason?: string) => void;
   calculateRankings: () => { bestBatsmen: Player[]; bestBowlers: Player[]; bestAllrounders: Player[]; };
   updateLiveMatchInState: (liveMatch: LiveMatch | null) => void;
@@ -409,7 +411,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const bowlerStats = currentInningData.bowlers[match.currentBowler.id] ||= {playerId: match.currentBowler.id as string, runs: 0, overs: 0, wickets: 0};
     bowlerStats.runs += runs;
 
-    const batsmanStats = currentInningData.batsmen[match.currentBatsmen.striker.id] ||= {playerId: match.currentBatsmen.striker.id as string, runs: 0, balls: 0, fours: 0, sixes: 0, out: false};
+    const batsmanStats = currentInningData.batsmen[match.currentBatsmen.striker.id] ||= {playerId: match.currentBatsmen.striker.id as string, runs: 0, balls: 0, fours: 0, sixes: 0, status: 'not_out'};
     if(!isExtra) {
         batsmanStats.runs += runs;
         if(runs === 4) batsmanStats.fours +=1;
@@ -426,7 +428,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if(isWicket) {
         currentBattingTeam.wickets += 1;
         bowlerStats.wickets += 1;
-        batsmanStats.out = true;
+        batsmanStats.status = 'out';
         if (wasLastBallOfOver) {
             match.currentBatsmen.striker = null;
             match.previousBowlerId = match.currentBowler.id;
@@ -486,6 +488,43 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const isLegal = type === 'No Ball';
     _updateScore(1, false, true, isLegal);
   }
+
+  const handleDismissal = (batsmanType: 'striker' | 'non-striker', runs: number, dismissalStatus: BatsmanStatus) => {
+    if (!liveMatch || !liveMatch.currentBowler) return;
+    let match = { ...liveMatch };
+
+    const batsmanToDismiss = match.currentBatsmen[batsmanType];
+    if (!batsmanToDismiss) return;
+    
+    // Process runs first
+    _updateScore(runs, false, false, true);
+    match = liveMatch ? { ...liveMatch } : match; // Refresh match state after update
+
+    const currentInningData = match.scorecard![`inning${match.currentInning}` as 'inning1' | 'inning2'];
+    const currentBattingTeam = match.teams.find(t => t.name === currentInningData.team)!;
+    
+    const batsmanStats = currentInningData.batsmen[batsmanToDismiss.id] ||= { playerId: batsmanToDismiss.id as string, runs: 0, balls: 0, fours: 0, sixes: 0, status: 'not_out' };
+    batsmanStats.status = dismissalStatus;
+    
+    if (dismissalStatus === 'out') {
+      currentBattingTeam.wickets += 1;
+      currentInningData.wickets += 1;
+      const bowlerStats = currentInningData.bowlers[match.currentBowler.id] ||= { playerId: match.currentBowler.id as string, runs: 0, overs: 0, wickets: 0 };
+      bowlerStats.wickets += 1;
+    }
+    
+    match.currentBatsmen[batsmanType] = null; // Vacate the spot
+
+    updateLiveMatchInState(match);
+  };
+
+  const handleRunOut = (batsmanOut: 'striker' | 'non-striker', runsCompleted: number) => {
+    handleDismissal(batsmanOut, runsCompleted, 'out');
+  };
+
+  const handleRetire = (batsmanRetired: 'striker' | 'non-striker') => {
+    handleDismissal(batsmanRetired, 0, 'retired');
+  };
 
   const endInning = () => {
     if(!liveMatch) return;
@@ -597,7 +636,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 const batStats = inning.batsmen[playerId];
                 runsScored += batStats.runs;
                 ballsFaced += batStats.balls;
-                if(batStats.out) isOut = true;
+                if(batStats.status === 'out') isOut = true;
             }
             if (inning?.bowlers[playerId]) {
                 const bowlStats = inning.bowlers[playerId];
@@ -788,7 +827,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const appData = { isAdmin, players, matches, tournaments, liveMatch, auction };
 
   return (
-    <AppContext.Provider value={{ ...appData, login, logout, addPlayer, scheduleMatch, deleteMatch, scheduleTournament, deleteTournament, registerTeamForTournament, startTournament, closeTournament, startScoringMatch, leaveLiveMatch, performToss, selectTossOption, scoreRun, scoreWicket, scoreExtra, endMatch, calculateRankings, updateLiveMatchInState, startAuction, placeBid, setLivePlayers, calculatePointsTable }}>
+    <AppContext.Provider value={{ ...appData, login, logout, addPlayer, scheduleMatch, deleteMatch, scheduleTournament, deleteTournament, registerTeamForTournament, startTournament, closeTournament, startScoringMatch, leaveLiveMatch, performToss, selectTossOption, scoreRun, scoreWicket, scoreExtra, endMatch, handleRunOut, handleRetire, calculateRankings, updateLiveMatchInState, startAuction, placeBid, setLivePlayers, calculatePointsTable }}>
       {children}
     </AppContext.Provider>
   );

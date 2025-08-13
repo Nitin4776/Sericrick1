@@ -1,5 +1,6 @@
 
 
+
 export interface PlayerStats {
   matches: number;
   runs: number;
@@ -34,6 +35,8 @@ export interface TeamInMatch {
   inningCompleted: boolean;
 }
 
+export type BatsmanStatus = 'not_out' | 'out' | 'retired';
+
 export interface ScorecardInning {
   team: string | null;
   batsmen: {
@@ -43,7 +46,7 @@ export interface ScorecardInning {
       balls: number;
       fours: number;
       sixes: number;
-      out: boolean;
+      status: BatsmanStatus;
     };
   };
   bowlers: {
@@ -140,6 +143,7 @@ export interface PointsTableEntry {
     teamName: string;
     played: number;
     won: number;
+
     lost: number;
     noResult: number;
     points: number;

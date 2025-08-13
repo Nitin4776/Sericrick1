@@ -24,9 +24,11 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { AdminGate } from "../admin-gate";
+import { Input } from "../ui/input";
 
 function PlayerSelectionCard({ title, children }: { title: string, children: React.ReactNode }) {
     return (
@@ -81,7 +83,7 @@ function PlayerSetup({ onConfirm }: { onConfirm: (strikerId: string, nonStrikerI
 
     if (!battingTeam || !bowlingTeam) return null;
     
-    const availableBatsmen = battingTeam.players.filter(p => !currentInningData.batsmen[p.id]?.out);
+    const availableBatsmen = battingTeam.players.filter(p => currentInningData.batsmen[p.id]?.status !== 'out');
     
     return (
         <PlayerSelectionCard title="Set Players for Inning">
@@ -120,9 +122,14 @@ function NewBatsmanSelector({ onConfirm }: { onConfirm: (strikerId: string) => v
     const currentInningData = liveMatch.scorecard?.[`inning${liveMatch.currentInning}` as 'inning1' | 'inning2'];
     const battingTeam = liveMatch.teams.find(t => t.name === currentInningData?.team);
 
-    if (!battingTeam) return null;
+    if (!battingTeam || !currentInningData) return null;
 
-    const availableBatsmen = battingTeam.players.filter(p => !currentInningData.batsmen[p.id]?.out && p.id !== liveMatch.currentBatsmen.nonStriker?.id);
+    const availableBatsmen = battingTeam.players.filter(p => {
+      const batsmanRecord = currentInningData.batsmen[p.id];
+      // Available if they don't have a record, or their status is not 'out'
+      // and they aren't the current non-striker
+      return (!batsmanRecord || batsmanRecord.status !== 'out') && p.id !== liveMatch.currentBatsmen.nonStriker?.id;
+    });
 
     return (
         <PlayerSelectionCard title="Wicket! Select New Batsman">
@@ -173,6 +180,17 @@ function LiveScorecard() {
     if (!liveMatch || !liveMatch.scorecard) return null;
 
     const getPlayerName = (id: string) => players.find(p => p.id === id)?.name || 'Unknown Player';
+    
+    const getBatsmanStatus = (status: 'not_out' | 'out' | 'retired', outBy?: string) => {
+      switch(status) {
+        case 'out':
+          return <span className="text-destructive text-xs ml-2">out</span>
+        case 'retired':
+           return <span className="text-blue-500 text-xs ml-2">retired</span>
+        default:
+          return null
+      }
+    }
 
     const renderInning = (inningData: ScorecardInning, inningNum: number) => {
         if (!inningData || !inningData.team) return null;
@@ -194,7 +212,7 @@ function LiveScorecard() {
                                 <TableBody>
                                     {batsmen.map(b => (
                                         <TableRow key={b.playerId}>
-                                            <TableCell>{getPlayerName(b.playerId)}{b.out && <span className="text-destructive text-xs ml-2">out</span>}</TableCell>
+                                            <TableCell>{getPlayerName(b.playerId)}{getBatsmanStatus(b.status)}</TableCell>
                                             <TableCell>{b.runs}</TableCell>
                                             <TableCell>{b.balls}</TableCell>
                                             <TableCell>{b.fours}</TableCell>
@@ -242,6 +260,50 @@ function LiveScorecard() {
             {renderInning(liveMatch.scorecard!.inning2, 2)}
         </Tabs>
     )
+}
+
+function DismissalDialog({ open, onOpenChange, onConfirm, liveMatch, type }: { open: boolean, onOpenChange: (open: boolean) => void, onConfirm: (batsman: 'striker' | 'non-striker', runs: number) => void, liveMatch: LiveMatch, type: 'Run Out' | 'Retire' }) {
+    const [selectedBatsman, setSelectedBatsman] = useState<'striker' | 'non-striker'>('striker');
+    const [runs, setRuns] = useState(0);
+
+    const strikerName = liveMatch.currentBatsmen.striker?.name;
+    const nonStrikerName = liveMatch.currentBatsmen.nonStriker?.name;
+
+    return (
+        <AlertDialog open={open} onOpenChange={onOpenChange}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>{type} Details</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Select the batsman and enter any details for the dismissal.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="space-y-4">
+                  <RadioGroup value={selectedBatsman} onValueChange={(val) => setSelectedBatsman(val as 'striker' | 'non-striker')} className="my-4">
+                      <Label>Which batsman is out?</Label>
+                      <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="striker" id="r-striker" />
+                          <Label htmlFor="r-striker">Striker: {strikerName}</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="non-striker" id="r-nonstriker" />
+                          <Label htmlFor="r-nonstriker">Non-Striker: {nonStrikerName}</Label>
+                      </div>
+                  </RadioGroup>
+                  {type === 'Run Out' && (
+                    <div>
+                      <Label>Runs Completed</Label>
+                      <Input type="number" value={runs} onChange={e => setRuns(parseInt(e.target.value))} min={0} max={6} />
+                    </div>
+                  )}
+                </div>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => onConfirm(selectedBatsman, runs)}>Confirm {type}</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    );
 }
 
 function EndMatchDialog({ open, onOpenChange, onConfirm }: { open: boolean, onOpenChange: (open: boolean) => void, onConfirm: (reason: string) => void }) {
@@ -306,12 +368,13 @@ function MatchCompletedDialog({ open, onOpenChange, result }: { open: boolean, o
 
 
 export function LiveScoringDashboard() {
-  const { matches, liveMatch, startScoringMatch, performToss, selectTossOption, scoreRun, scoreWicket, scoreExtra, endMatch, setLivePlayers, players, leaveLiveMatch, isAdmin } = useAppContext();
+  const { matches, liveMatch, startScoringMatch, performToss, selectTossOption, scoreRun, scoreWicket, scoreExtra, endMatch, setLivePlayers, players, leaveLiveMatch, isAdmin, handleRunOut, handleRetire } = useAppContext();
   const router = useRouter();
   const [selectedMatchId, setSelectedMatchId] = useState<string>('');
   const [isClient, setIsClient] = useState(false);
   const [isEndMatchDialogOpen, setIsEndMatchDialogOpen] = useState(false);
   const [isMatchCompletedDialogOpen, setMatchCompletedDialogOpen] = useState(false);
+  const [dismissalType, setDismissalType] = useState<'Run Out' | 'Retire' | null>(null);
 
   useEffect(() => {
     setIsClient(true);
@@ -351,6 +414,15 @@ export function LiveScoringDashboard() {
     endMatch(reason);
     setIsEndMatchDialogOpen(false);
   }
+  
+  const handleDismissalConfirm = (batsman: 'striker' | 'non-striker', runs: number) => {
+    if (dismissalType === 'Run Out') {
+      handleRunOut(batsman, runs);
+    } else if (dismissalType === 'Retire') {
+      handleRetire(batsman);
+    }
+    setDismissalType(null);
+  };
 
   const scheduledMatches = matches.filter(m => m.status === 'scheduled');
 
@@ -399,7 +471,7 @@ export function LiveScoringDashboard() {
   const currentInningData = liveMatch.scorecard?.[`inning${liveMatch.currentInning}` as 'inning1' | 'inning2'];
   
   const arePlayersSet = liveMatch.currentBatsmen.striker && liveMatch.currentBatsmen.nonStriker && liveMatch.currentBowler;
-  const isWicketFallen = liveMatch.currentBatsmen.striker === null && liveMatch.currentBatsmen.nonStriker !== null;
+  const isWicketFallen = (liveMatch.currentBatsmen.striker === null && liveMatch.currentBatsmen.nonStriker !== null) || (liveMatch.currentBatsmen.nonStriker === null && liveMatch.currentBatsmen.striker !== null);
   const isOverFinished = liveMatch.currentOver > 0 && liveMatch.ballsInOver === 0 && liveMatch.currentBowler === null;
   
   const inningStarted = !!currentInningData?.team;
@@ -501,9 +573,10 @@ export function LiveScoringDashboard() {
                             <Label>Events</Label>
                             <div className="flex flex-wrap gap-2">
                                 <Button variant="destructive" onClick={scoreWicket}>Wicket</Button>
+                                <Button variant="destructive" onClick={() => setDismissalType('Run Out')}>Run Out</Button>
+                                <Button variant="destructive" onClick={() => setDismissalType('Retire')} className="bg-blue-600 hover:bg-blue-700">Retire</Button>
                                 <Button variant="secondary" onClick={() => scoreExtra('Wide')}>Wide</Button>
                                 <Button variant="secondary" onClick={() => scoreExtra('No Ball')}>No Ball</Button>
-                                <Button variant="outline" onClick={() => scoreRun(1, true)}>Declare 1 Run</Button>
                             </div>
                         </div>
                     </CardContent>
@@ -606,6 +679,15 @@ export function LiveScoringDashboard() {
             onOpenChange={setMatchCompletedDialogOpen}
             result={liveMatch.result}
         />
+        {dismissalType && liveMatch && (
+            <DismissalDialog
+                open={!!dismissalType}
+                onOpenChange={() => setDismissalType(null)}
+                onConfirm={handleDismissalConfirm}
+                liveMatch={liveMatch}
+                type={dismissalType}
+            />
+        )}
     </div>
   );
 }
