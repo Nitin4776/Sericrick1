@@ -20,8 +20,15 @@ const matchSchema = z.object({
   venue: z.string().min(2, "Venue is required."),
   team1Name: z.string().min(2, "Team 1 name is required."),
   team2Name: z.string().min(2, "Team 2 name is required."),
-  team1Players: z.array(z.string()).min(1, "Select at least one player for Team 1."),
-  team2Players: z.array(z.string()).min(1, "Select at least one player for Team 2."),
+  team1Players: z.array(z.string())
+    .min(5, "Each team must have at least 5 players.")
+    .max(11, "Each team cannot have more than 11 players."),
+  team2Players: z.array(z.string())
+    .min(5, "Each team must have at least 5 players.")
+    .max(11, "Each team cannot have more than 11 players."),
+}).refine(data => data.team1Players.length === data.team2Players.length, {
+  message: "Both teams must have the same number of players.",
+  path: ["team2Players"], // Show error on the second player list
 });
 
 type MatchFormValues = z.infer<typeof matchSchema>;
