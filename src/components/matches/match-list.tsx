@@ -107,7 +107,7 @@ export function MatchList() {
                         <PlayCircle className="h-4 w-4 mr-2" /> Start Scoring
                     </Button>
                   )}
-                  {m.status === 'live' && isAdmin && (
+                  {m.status === 'live' && (
                     <Button onClick={() => handleViewLiveScorecard(m.id as string)} size="sm">
                         <BarChart2 className="h-4 w-4 mr-2" /> View Live Scorecard
                     </Button>

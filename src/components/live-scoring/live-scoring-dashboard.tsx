@@ -26,6 +26,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { AdminGate } from "../admin-gate";
 
 function PlayerSelectionCard({ title, children }: { title: string, children: React.ReactNode }) {
     return (
@@ -305,7 +306,7 @@ function MatchCompletedDialog({ open, onOpenChange, result }: { open: boolean, o
 
 
 export function LiveScoringDashboard() {
-  const { matches, liveMatch, startScoringMatch, performToss, selectTossOption, scoreRun, scoreWicket, scoreExtra, endMatch, setLivePlayers, players, leaveLiveMatch } = useAppContext();
+  const { matches, liveMatch, startScoringMatch, performToss, selectTossOption, scoreRun, scoreWicket, scoreExtra, endMatch, setLivePlayers, players, leaveLiveMatch, isAdmin } = useAppContext();
   const router = useRouter();
   const [selectedMatchId, setSelectedMatchId] = useState<string>('');
   const [isClient, setIsClient] = useState(false);
@@ -370,26 +371,28 @@ export function LiveScoringDashboard() {
 
   if (!liveMatch) {
     return (
-      <Card className="max-w-2xl mx-auto">
-        <CardHeader>
-          <CardTitle>Start Live Scoring</CardTitle>
-          <CardDescription>Select a scheduled match to begin live scoring.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-            <Select onValueChange={setSelectedMatchId} value={selectedMatchId}>
-                <SelectTrigger><SelectValue placeholder="Select a match..." /></SelectTrigger>
-                <SelectContent>
-                {scheduledMatches.map(match => (
-                    <SelectItem key={match.id} value={match.id}>
-                    {match.teams[0].name} vs {match.teams[1].name}
-                    </SelectItem>
-                ))}
-                </SelectContent>
-            </Select>
-            <Button onClick={handleStart} disabled={!selectedMatchId}>Start Scoring</Button>
-            {scheduledMatches.length === 0 && <p className="text-sm text-muted-foreground">No scheduled matches available.</p>}
-        </CardContent>
-      </Card>
+      <AdminGate>
+        <Card className="max-w-2xl mx-auto">
+          <CardHeader>
+            <CardTitle>Start Live Scoring</CardTitle>
+            <CardDescription>Select a scheduled match to begin live scoring.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+              <Select onValueChange={setSelectedMatchId} value={selectedMatchId}>
+                  <SelectTrigger><SelectValue placeholder="Select a match..." /></SelectTrigger>
+                  <SelectContent>
+                  {scheduledMatches.map(match => (
+                      <SelectItem key={match.id} value={match.id}>
+                      {match.teams[0].name} vs {match.teams[1].name}
+                      </SelectItem>
+                  ))}
+                  </SelectContent>
+              </Select>
+              <Button onClick={handleStart} disabled={!selectedMatchId}>Start Scoring</Button>
+              {scheduledMatches.length === 0 && <p className="text-sm text-muted-foreground">No scheduled matches available.</p>}
+          </CardContent>
+        </Card>
+      </AdminGate>
     );
   }
   
@@ -424,86 +427,105 @@ export function LiveScoringDashboard() {
     
     if (isMatchStarting) {
        return (
-            <Card>
-                <CardHeader><CardTitle>Toss</CardTitle></CardHeader>
-                <CardContent className="space-y-4">
-                    {liveMatch.tossWinner === undefined ? (
-                         <Button onClick={performToss}><Coins className="mr-2 h-4 w-4" />Perform Toss</Button>
-                    ): (
-                        <div>
-                            <Alert>
-                                <AlertTitle>{liveMatch.teams[liveMatch.tossWinner as number].name} won the toss!</AlertTitle>
-                                <AlertDescription>Choose to bat or bowl.</AlertDescription>
-                            </Alert>
-                            <div className="mt-4 space-x-2">
-                                <Button onClick={() => selectTossOption('Bat')}>Bat</Button>
-                                <Button onClick={() => selectTossOption('Bowl')} variant="outline">Bowl</Button>
+            <AdminGate block={false} message="Only admins can perform the toss.">
+                <Card>
+                    <CardHeader><CardTitle>Toss</CardTitle></CardHeader>
+                    <CardContent className="space-y-4">
+                        {liveMatch.tossWinner === undefined ? (
+                            <Button onClick={performToss}><Coins className="mr-2 h-4 w-4" />Perform Toss</Button>
+                        ): (
+                            <div>
+                                <Alert>
+                                    <AlertTitle>{liveMatch.teams[liveMatch.tossWinner as number].name} won the toss!</AlertTitle>
+                                    <AlertDescription>Choose to bat or bowl.</AlertDescription>
+                                </Alert>
+                                <div className="mt-4 space-x-2">
+                                    <Button onClick={() => selectTossOption('Bat')}>Bat</Button>
+                                    <Button onClick={() => selectTossOption('Bowl')} variant="outline">Bowl</Button>
+                                </div>
                             </div>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+                        )}
+                    </CardContent>
+                </Card>
+            </AdminGate>
        );
     }
 
     if (isInningStarting) {
-        return <PlayerSetup onConfirm={handleSetInitialPlayers} />;
+        return <AdminGate block={false} message="Only admins can set players."><PlayerSetup onConfirm={handleSetInitialPlayers} /></AdminGate>;
     }
 
     if (isWicketFallen) {
-        return <NewBatsmanSelector onConfirm={handleSetNewBatsman} />;
+        return <AdminGate block={false} message="Only admins can set players."><NewBatsmanSelector onConfirm={handleSetNewBatsman} /></AdminGate>;
     }
 
     if (isOverFinished && !isWicketFallen) {
-        return <NewBowlerSelector onConfirm={handleSetNewBowler} />;
+        return <AdminGate block={false} message="Only admins can set players."><NewBowlerSelector onConfirm={handleSetNewBowler} /></AdminGate>;
     }
 
     if (arePlayersSet) {
         return (
-            <Card>
-                <CardHeader>
-                    <CardTitle>Ball-by-Ball Scoring</CardTitle>
-                    <CardDescription>
-                       <div className="flex flex-col sm:flex-row sm:flex-wrap gap-x-4 gap-y-2 text-sm mt-2">
-                           <span className="flex items-center"><User className="mr-1 h-4 w-4 text-primary"/>Striker: <strong>{liveMatch.currentBatsmen.striker?.name}</strong></span>
-                           <span className="flex items-center"><User className="mr-1 h-4 w-4 text-muted-foreground"/>Non-Striker: <strong>{liveMatch.currentBatsmen.nonStriker?.name}</strong></span>
-                           <span className="flex items-center"><Shield className="mr-1 h-4 w-4 text-primary"/>Bowler: <strong>{liveMatch.currentBowler?.name}</strong></span>
-                       </div>
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div>
-                        <Label>This Over</Label>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                            {overEvents.length > 0 ? overEvents.map((event, i) => (
-                                <Badge key={i} variant={event === 'W' ? 'destructive' : 'secondary'} className="text-lg">{event}</Badge>
-                            )) : <p className="text-sm text-muted-foreground">First ball of the over.</p>}
+            <AdminGate block={false} message="Only admins can score the match.">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Ball-by-Ball Scoring</CardTitle>
+                        <CardDescription>
+                        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-x-4 gap-y-2 text-sm mt-2">
+                            <span className="flex items-center"><User className="mr-1 h-4 w-4 text-primary"/>Striker: <strong>{liveMatch.currentBatsmen.striker?.name}</strong></span>
+                            <span className="flex items-center"><User className="mr-1 h-4 w-4 text-muted-foreground"/>Non-Striker: <strong>{liveMatch.currentBatsmen.nonStriker?.name}</strong></span>
+                            <span className="flex items-center"><Shield className="mr-1 h-4 w-4 text-primary"/>Bowler: <strong>{liveMatch.currentBowler?.name}</strong></span>
                         </div>
-                    </div>
-                    <div className="space-y-2">
-                        <Label>Score Runs</Label>
-                        <div className="flex flex-wrap gap-2">
-                            <Button variant="outline" onClick={() => scoreRun(0)}>0</Button>
-                            <Button variant="outline" onClick={() => scoreRun(1)}>1</Button>
-                            <Button variant="outline" onClick={() => scoreRun(2)}>2</Button>
-                            <Button variant="outline" onClick={() => scoreRun(3)}>3</Button>
-                            <Button variant="default" onClick={() => scoreRun(4)}>4</Button>
-                            <Button variant="default" onClick={() => scoreRun(6)}>6</Button>
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div>
+                            <Label>This Over</Label>
+                            <div className="flex flex-wrap gap-2 mt-2">
+                                {overEvents.length > 0 ? overEvents.map((event, i) => (
+                                    <Badge key={i} variant={event === 'W' ? 'destructive' : 'secondary'} className="text-lg">{event}</Badge>
+                                )) : <p className="text-sm text-muted-foreground">First ball of the over.</p>}
+                            </div>
                         </div>
-                    </div>
-                    <div className="space-y-2">
-                        <Label>Events</Label>
-                        <div className="flex flex-wrap gap-2">
-                            <Button variant="destructive" onClick={scoreWicket}>Wicket</Button>
-                            <Button variant="secondary" onClick={() => scoreExtra('Wide')}>Wide</Button>
-                            <Button variant="secondary" onClick={() => scoreExtra('No Ball')}>No Ball</Button>
-                            <Button variant="outline" onClick={() => scoreRun(1, true)}>Declare 1 Run</Button>
+                        <div className="space-y-2">
+                            <Label>Score Runs</Label>
+                            <div className="flex flex-wrap gap-2">
+                                <Button variant="outline" onClick={() => scoreRun(0)}>0</Button>
+                                <Button variant="outline" onClick={() => scoreRun(1)}>1</Button>
+                                <Button variant="outline" onClick={() => scoreRun(2)}>2</Button>
+                                <Button variant="outline" onClick={() => scoreRun(3)}>3</Button>
+                                <Button variant="default" onClick={() => scoreRun(4)}>4</Button>
+                                <Button variant="default" onClick={() => scoreRun(6)}>6</Button>
+                            </div>
                         </div>
-                    </div>
-                </CardContent>
-            </Card>
+                        <div className="space-y-2">
+                            <Label>Events</Label>
+                            <div className="flex flex-wrap gap-2">
+                                <Button variant="destructive" onClick={scoreWicket}>Wicket</Button>
+                                <Button variant="secondary" onClick={() => scoreExtra('Wide')}>Wide</Button>
+                                <Button variant="secondary" onClick={() => scoreExtra('No Ball')}>No Ball</Button>
+                                <Button variant="outline" onClick={() => scoreRun(1, true)}>Declare 1 Run</Button>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            </AdminGate>
         )
     }
+
+    // Fallback for non-admins if no other condition is met (e.g., waiting for admin action)
+    if (!isAdmin) {
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><Info className="h-5 w-5 text-primary" />Live View</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-muted-foreground">You are viewing the live scorecard. An admin is currently managing the match.</p>
+                </CardContent>
+            </Card>
+        );
+    }
+
 
     return (
         <Card>
@@ -564,7 +586,9 @@ export function LiveScoringDashboard() {
                 </CardContent>
             )}
              <CardFooter>
-                 {liveMatch.status !== 'completed' && <Button variant="link" onClick={() => setIsEndMatchDialogOpen(true)}>End & Finalize Match</Button>}
+                 <AdminGate block={false}>
+                    {liveMatch.status !== 'completed' && <Button variant="link" onClick={() => setIsEndMatchDialogOpen(true)}>End & Finalize Match</Button>}
+                 </AdminGate>
             </CardFooter>
         </Card>
 
