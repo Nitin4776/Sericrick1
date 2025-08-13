@@ -197,6 +197,7 @@ export function TournamentDetailPageClient({ tournament }: { tournament: Tournam
   const [isScorecardOpen, setScorecardOpen] = useState(false);
   const [formattedDates, setFormattedDates] = useState<string>('');
   const [isClient, setIsClient] = useState(false);
+  const [playerSearch, setPlayerSearch] = useState("");
 
   useEffect(() => {
     setIsClient(true);
@@ -257,6 +258,8 @@ export function TournamentDetailPageClient({ tournament }: { tournament: Tournam
     const allPlayerIds = tournament.teams.flatMap(team => team.playerIds);
     return new Set(allPlayerIds);
   }, [tournament]);
+
+  const filteredPlayers = players.filter(p => p.name.toLowerCase().includes(playerSearch.toLowerCase()));
   
   if (!tournament) {
     return (
@@ -383,8 +386,14 @@ export function TournamentDetailPageClient({ tournament }: { tournament: Tournam
                                 render={() => (
                                     <FormItem>
                                     <FormLabel>Select Players</FormLabel>
+                                    <Input
+                                        placeholder="Search players..."
+                                        value={playerSearch}
+                                        onChange={(e) => setPlayerSearch(e.target.value)}
+                                        className="mb-2"
+                                    />
                                     <ScrollArea className="h-60 w-full rounded-md border p-4">
-                                        {players.map((player: Player) => (
+                                        {filteredPlayers.map((player: Player) => (
                                         <FormField
                                             key={player.id as string}
                                             control={form.control}
