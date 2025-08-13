@@ -333,7 +333,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const matchDoc = await getDoc(matchRef);
 
     if (!matchDoc.exists()) {
-      console.error("Match document does not exist, cannot end match.");
       setLiveMatch(null); // Clear the stale live match data
       return;
     }
