@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
@@ -15,6 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Users, Calendar, MapPin, Trophy, PlusCircle, ArrowLeft } from "lucide-react";
+import React from "react";
 
 const teamSchema = z.object({
   name: z.string().min(2, "Team name is required."),
@@ -26,7 +28,7 @@ type TeamFormValues = z.infer<typeof teamSchema>;
 export default function TournamentDetailPage() {
   const { id } = useParams();
   const router = useRouter();
-  const { tournaments, players, registerTeamForTournament, isAdmin } = useAppContext();
+  const { tournaments, players, registerTeamForTournament } = useAppContext();
   const { toast } = useToast();
 
   const tournament = tournaments.find(t => t.id === id);
@@ -47,6 +49,12 @@ export default function TournamentDetailPage() {
         form.reset();
     }
   };
+
+  const registeredPlayerIds = React.useMemo(() => {
+    if (!tournament) return new Set();
+    const allPlayerIds = tournament.teams.flatMap(team => team.playerIds);
+    return new Set(allPlayerIds);
+  }, [tournament]);
   
   if (!tournament) {
     return (
@@ -145,6 +153,7 @@ export default function TournamentDetailPage() {
                                     <FormControl>
                                     <Checkbox
                                         checked={field.value?.includes(player.id as string)}
+                                        disabled={registeredPlayerIds.has(player.id as string)}
                                         onCheckedChange={(checked) => {
                                         return checked
                                             ? field.onChange([...field.value, player.id as string])
@@ -174,3 +183,4 @@ export default function TournamentDetailPage() {
     </div>
   );
 }
+
