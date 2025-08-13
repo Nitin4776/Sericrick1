@@ -7,7 +7,7 @@ import { db } from '@/lib/firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, where, getDocs, writeBatch, getDoc, arrayUnion } from 'firebase/firestore';
 import type { AppData, Player, Match, Tournament, LiveMatch, AuctionPlayer, Auction, PlayerStats, TeamInTournament, TeamInMatch } from '@/lib/types';
 import { useLocalStorage } from '@/hooks/use-local-storage';
-import { toast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 const ADMIN_ID = 'User1';
 const ADMIN_PASS = 'Elan2025';
@@ -50,6 +50,7 @@ type AppContextType = AppData & {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
+  const { toast } = useToast();
   const [isAdmin, setIsAdmin] = useLocalStorage<boolean>('sericrick_admin_status', false);
   const [players, setPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
@@ -62,7 +63,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       setPlayers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Player)));
     });
     const unsubMatches = onSnapshot(query(collection(db, "matches")), (snapshot) => {
-        setMatches(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Match)).sort((a,b) => String(a.id).localeCompare(String(b.id))));
+        const fetchedMatches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Match));
+        fetchedMatches.sort((a,b) => String(a.id).localeCompare(String(b.id)));
+        setMatches(fetchedMatches);
     });
     const unsubTournaments = onSnapshot(collection(db, "tournaments"), (snapshot) => {
       setTournaments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Tournament)));
@@ -129,7 +132,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const deleteMatch = async (matchId: string) => {
     if (liveMatch && liveMatch.id === matchId) {
-        alert("Cannot delete a match that is currently live.");
+        toast({
+            title: "Action Denied",
+            description: "Cannot delete a match that is currently live.",
+            variant: "destructive"
+        });
         return;
     }
     await deleteDoc(doc(db, "matches", matchId));
@@ -360,6 +367,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     let event = isWicket ? 'W' : `${runs}`;
     if (isExtra) event += 'wd'; // simplified for now
+    if (!match.overEvents) {
+      match.overEvents = [];
+    }
     match.overEvents.push(event);
     
     currentBattingTeam.runs += runs;
@@ -450,7 +460,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const endMatch = async () => {
     if(!liveMatch) return;
 
-    const matchRef = doc(db, "matches", liveMatch.id as string);
+    const matchRef = doc(db, "matches", liveMatch.id);
     const matchDoc = await getDoc(matchRef);
 
     if (!matchDoc.exists()) {

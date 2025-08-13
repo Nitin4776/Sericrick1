@@ -63,7 +63,7 @@ export interface Scorecard {
 }
 
 export interface Match {
-  id: number | string;
+  id: string;
   overs: number;
   venue: string;
   teams: [TeamInMatch, TeamInMatch];
