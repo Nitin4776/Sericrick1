@@ -81,6 +81,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
+  useEffect(() => {
+    // This effect validates the auction data whenever tournaments change.
+    if (auction && tournaments.length > 0) {
+      const tournamentExists = tournaments.some(t => t.id === auction.tournamentId);
+      if (!tournamentExists) {
+        setAuction(null); // Clear invalid auction data from local storage
+      }
+    }
+  }, [auction, tournaments, setAuction]);
+
   const login = (id: string, pass: string): boolean => {
     if (id === ADMIN_ID && pass === ADMIN_PASS) {
       setIsAdmin(true);
@@ -403,16 +413,22 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const currentBattingTeam = match.teams.find(t => t.name === currentInningData.team)!;
 
     let event = '';
-    if (isWicket) {
+    if (isWicket && !isRunOut) { // Wicket other than runout
         event = 'W';
-    } else if (isExtra && runsOffBatForNoBall > 0) {
+    } else if (isExtra && runsOffBatForNoBall > 0) { // No ball with runs
         event = `${runsOffBatForNoBall}nb`;
-    } else if (isExtra) {
-        event = isLegalBall ? '1nb' : 'wd';
-    } else {
+    } else if (isExtra && !isLegalBall) { // Wide
+        event = 'wd';
+    } else if (isExtra) { // No ball without runs
+        event = 'nb';
+    }
+     else { // Regular runs
         event = `${runs}`;
     }
-    match.overEvents.push(event);
+
+    if(event) {
+        match.overEvents.push(event);
+    }
     
     const totalRuns = runs + runsOffBatForNoBall;
     currentBattingTeam.runs += totalRuns;
@@ -431,11 +447,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     if(isLegalBall) {
         match.ballsInOver += 1;
-        if (!isExtra) {
-          batsmanStats.balls +=1;
-        }
+        batsmanStats.balls +=1;
     }
     
+    if (isRunOut) {
+        match.overEvents.push('W');
+    }
+
     const wasLastBallOfOver = match.ballsInOver === 6;
 
     if(isWicket) {
@@ -503,47 +521,32 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (type === 'Wide') {
         _updateScore(1, false, true, false);
     } else { // No Ball
-        _updateScore(1, false, true, true, false, false, runsOffBat);
+        const isLegal = runsOffBat > 0;
+        _updateScore(1, false, true, isLegal, false, false, runsOffBat);
     }
   }
 
   const handleDismissal = (batsmanType: 'striker' | 'non-striker', runs: number, dismissalStatus: BatsmanStatus, isRunOut: boolean = false) => {
     if (!liveMatch) return;
-    
-    // Process runs first, and flag it as a run-out wicket event for display
-    _updateScore(runs, true, false, true, false, isRunOut);
-    
-    // We need to get the latest state after _updateScore runs, as it modifies it
-    let match = { ...liveMatch }; 
-    if(!match.currentBowler) {
-      const bowlingTeam = match.teams.find(t => t.name !== match.scorecard?.[`inning${match.currentInning}` as 'inning1' | 'inning2']?.team)
-      if(bowlingTeam) {
-        const lastBowler = bowlingTeam.players.find(p => p.id === match.previousBowlerId);
-        if(lastBowler) match.currentBowler = lastBowler
-        else match.currentBowler = bowlingTeam.players[0]
-      }
-    }
+    let match = { ...liveMatch };
+
     const batsmanToDismiss = match.currentBatsmen[batsmanType];
-    if (!batsmanToDismiss) {
-      const otherBatsmanType = batsmanType === 'striker' ? 'nonStriker' : 'striker';
-      const otherBatsman = match.currentBatsmen[otherBatsmanType];
-      if (otherBatsman) {
-        match.currentBatsmen[batsmanType] = otherBatsman;
-        match.currentBatsmen[otherBatsmanType] = null;
-      } else {
-        return;
-      }
-    }
+    if (!batsmanToDismiss) return;
     
+    // For run-outs, we process runs first. This call will handle the ball count correctly.
+    // The wicket part of a run-out is handled separately to assign it to the correct batsman.
+    _updateScore(runs, false, false, true, false, true);
+
+    match = { ...liveMatch }; // Re-fetch state as _updateScore modifies it
     const currentInningData = match.scorecard![`inning${match.currentInning}` as 'inning1' | 'inning2'];
     const currentBattingTeam = match.teams.find(t => t.name === currentInningData.team)!;
     
     const batsmanStats = currentInningData.batsmen[batsmanToDismiss.id] ||= { playerId: batsmanToDismiss.id as string, runs: 0, balls: 0, fours: 0, sixes: 0, status: 'not_out' };
     batsmanStats.status = dismissalStatus;
     
-    // Wicket count was already incremented in _updateScore, so we just set the batsman status
     if (dismissalStatus === 'out') {
-      currentBattingTeam.wickets = currentInningData.wickets; // Sync team wickets
+      currentBattingTeam.wickets += 1;
+      currentInningData.wickets = currentBattingTeam.wickets;
     }
     
     match.currentBatsmen[batsmanType] = null; // Vacate the spot
@@ -874,4 +877,3 @@ export const useAppContext = (): AppContextType => {
   return context;
 };
 
-    
