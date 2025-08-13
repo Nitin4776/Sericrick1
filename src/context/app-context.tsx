@@ -27,7 +27,7 @@ type AppContextType = AppData & {
   addPlayer: (playerData: Omit<Player, 'id' | 'stats'>) => Promise<boolean>;
   scheduleMatch: (matchData: Omit<Match, 'id' | 'status' | 'result' | 'playerOfTheMatch' | 'scorecard'>) => Promise<void>;
   deleteMatch: (matchId: string) => Promise<void>;
-  scheduleTournament: (tournamentData: Omit<Tournament, 'id' | 'teams' | 'status'>) => Promise<void>;
+  scheduleTournament: (tournamentData: Omit<Tournament, 'id' | 'teams' | 'status' | 'scheduledMatches'>) => Promise<void>;
   deleteTournament: (tournamentId: string) => Promise<void>;
   registerTeamForTournament: (tournamentId: string, teamData: Omit<TeamInTournament, 'id'>) => Promise<boolean>;
   startTournament: (tournamentId: string) => Promise<void>;
@@ -218,7 +218,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         for (let i = 0; i < (tournament.numberOfMatches || 1); i++) {
             const matchRef = doc(collection(db, "matches"));
             batch.set(matchRef, {
-                overs: 8, // Default overs, can be configurable later
+                overs: tournament.overs,
                 venue: tournament.venue,
                 teams: [teamsInTournament[0], teamsInTournament[1]],
                 status: 'scheduled',
@@ -239,7 +239,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             for (let j = i + 1; j < teamsInTournament.length; j++) {
                 const matchRef = doc(collection(db, "matches"));
                  batch.set(matchRef, {
-                    overs: 8,
+                    overs: tournament.overs,
                     venue: tournament.venue,
                     teams: [teamsInTournament[i], teamsInTournament[j]],
                     status: 'scheduled',
@@ -287,7 +287,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   
     const liveMatchData: LiveMatch = {
       ...JSON.parse(JSON.stringify(match)),
-      id: matchId,
+      id: String(matchId),
       teams: [
         { ...match.teams[0], players: team1Players },
         { ...match.teams[1], players: team2Players }
@@ -504,7 +504,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const endMatch = async (reason?: string) => {
     if(!liveMatch) return;
 
-    const matchRef = doc(db, "matches", liveMatch.id);
+    const matchRef = doc(db, "matches", String(liveMatch.id));
     const matchDoc = await getDoc(matchRef);
 
     if (!matchDoc.exists()) {
@@ -517,17 +517,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (reason) {
         match.result = reason;
     } else {
-        const team1 = match.teams[0];
-        const team2 = match.teams[1];
-        const team1Score = match.scorecard?.inning1.team === team1.name ? team1.runs : team2.runs;
-        const team2Score = match.scorecard?.inning1.team === team2.name ? team1.runs : team2.runs;
+        const team1Data = match.teams.find(t => t.name === match.scorecard!.inning1.team);
+        const team2Data = match.teams.find(t => t.name === match.scorecard!.inning2.team);
+        
+        const team1Score = team1Data ? team1Data.runs : 0;
+        const team2Score = team2Data ? team2Data.runs : 0;
 
         if (team1Score > team2Score) {
-            match.result = `${team1.name} won by ${team1Score - team2Score} runs`;
+            match.result = `${team1Data!.name} won by ${team1Score - team2Score} runs`;
         } else if (team2Score > team1Score) {
-            const chasingTeam = match.scorecard?.inning2.team === team2.name ? team2 : team1;
-            const wicketsLeft = chasingTeam.players.length - 1 - chasingTeam.wickets;
-            match.result = `${chasingTeam.name} won by ${wicketsLeft} wickets`;
+            const wicketsLeft = team2Data!.players.length - 1 - team2Data!.wickets;
+            match.result = `${team2Data!.name} won by ${wicketsLeft} wickets`;
         } else {
             match.result = "Match Tied";
         }
@@ -654,7 +654,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (!auction) return false;
 
     const newAuction = { ...auction };
-    const playerIndex = newAuction.players.findIndex(p => p.id === playerId);
+    const playerIndex = newAuction.players.findIndex(p => p.id === String(playerId));
     if (playerIndex === -1 || bidAmount <= newAuction.players[playerIndex].bidAmount) return false;
 
     newAuction.players[playerIndex] = { ...newAuction.players[playerIndex], bidAmount, bidder: teamName, status: 'Sold' };
@@ -678,5 +678,3 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
-
-    

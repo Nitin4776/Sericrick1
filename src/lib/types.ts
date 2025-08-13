@@ -110,6 +110,7 @@ export interface Tournament {
   name: string;
   venue: string;
   description: string;
+  overs: number;
   format: TournamentFormat;
   numberOfMatches?: number;
   dates: {

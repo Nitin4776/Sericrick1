@@ -18,6 +18,7 @@ import type { TournamentFormat } from "@/lib/types";
 const tournamentSchema = z.object({
   name: z.string().min(3, "Tournament name is required."),
   venue: z.string().min(3, "Venue is required."),
+  overs: z.coerce.number().min(1, "Overs must be at least 1."),
   startDate: z.string().min(1, "Start date is required"),
   endDate: z.string().min(1, "End date is required"),
   description: z.string().optional(),
@@ -52,6 +53,7 @@ export function TournamentForm() {
     defaultValues: {
       name: "",
       venue: "",
+      overs: 8,
       startDate: "",
       endDate: "",
       description: "",
@@ -66,6 +68,7 @@ export function TournamentForm() {
     scheduleTournament({
       name: data.name,
       venue: data.venue,
+      overs: data.overs,
       dates: { start: data.startDate, end: data.endDate },
       description: data.description || "",
       format: data.format,
@@ -133,7 +136,18 @@ export function TournamentForm() {
                   )}
                 />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                 <FormField
+                    control={form.control}
+                    name="overs"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Overs per Match</FormLabel>
+                        <FormControl><Input type="number" placeholder="e.g. 20" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 <FormField
                     control={form.control}
                     name="format"
