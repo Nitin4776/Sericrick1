@@ -7,6 +7,7 @@ import { db } from '@/lib/firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, where, getDocs, writeBatch, getDoc } from 'firebase/firestore';
 import type { AppData, Player, Match, Tournament, LiveMatch, AuctionPlayer, Auction, PlayerStats } from '@/lib/types';
 import { useLocalStorage } from '@/hooks/use-local-storage';
+import { toast } from '@/hooks/use-toast';
 
 const ADMIN_ID = 'User1';
 const ADMIN_PASS = 'Elan2025';
@@ -320,6 +321,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     if (match.currentInning === 1) {
         match.currentInning = 2;
+        toast({
+          title: "Innings End",
+          description: "The first innings is complete. Please set up players for the second innings.",
+        });
         updateLiveMatchInState(match);
     } else {
         endMatch();
@@ -498,3 +503,5 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
+
+    
