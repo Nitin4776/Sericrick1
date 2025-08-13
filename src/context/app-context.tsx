@@ -4,8 +4,8 @@
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, where, getDocs, writeBatch } from 'firebase/firestore';
-import type { AppData, Player, Match, Tournament, LiveMatch, AuctionPlayer, Auction, ScorecardInning, PlayerStats } from '@/lib/types';
+import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, where, getDocs, writeBatch, getDoc } from 'firebase/firestore';
+import type { AppData, Player, Match, Tournament, LiveMatch, AuctionPlayer, Auction, PlayerStats } from '@/lib/types';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 
 const ADMIN_ID = 'User1';
@@ -122,6 +122,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const deleteMatch = async (matchId: string) => {
+    if (liveMatch && liveMatch.id === matchId) {
+        alert("Cannot delete a match that is currently live.");
+        return;
+    }
     await deleteDoc(doc(db, "matches", matchId));
   };
 
@@ -227,13 +231,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if(!liveMatch || !liveMatch.currentBatsmen.striker || !liveMatch.currentBowler) return;
 
     let match = { ...liveMatch };
-    const currentInningData = match.scorecard![`inning${match.currentInning}` as 'inning1' | 'inning2'];
-    const currentBattingTeam = match.teams.find(t => t.name === currentInningData.team)!;
-    
     if (!match.overEvents) {
       match.overEvents = [];
     }
 
+    const currentInningData = match.scorecard![`inning${match.currentInning}` as 'inning1' | 'inning2'];
+    const currentBattingTeam = match.teams.find(t => t.name === currentInningData.team)!;
+    
     // Add event to over history
     let event = isWicket ? 'W' : `${runs}`;
     if (isExtra) event += 'wd'; // simplified for now
@@ -324,6 +328,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const endMatch = async () => {
     if(!liveMatch) return;
+
+    const matchRef = doc(db, "matches", liveMatch.id as string);
+    const matchDoc = await getDoc(matchRef);
+
+    if (!matchDoc.exists()) {
+      console.error("Match document does not exist, cannot end match.");
+      setLiveMatch(null); // Clear the stale live match data
+      return;
+    }
+
     const match: Match = { ...liveMatch };
     const team1 = match.teams[0];
     const team2 = match.teams[1];
@@ -413,7 +427,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     delete (finalMatchData as any).tossWinner;
 
 
-    const matchRef = doc(db, "matches", match.id as string);
     batch.update(matchRef, finalMatchData);
     
     await batch.commit();
@@ -486,5 +499,3 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
-
-    
