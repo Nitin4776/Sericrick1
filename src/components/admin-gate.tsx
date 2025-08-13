@@ -5,9 +5,42 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ShieldAlert } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Skeleton } from "./ui/skeleton";
 
 export function AdminGate({ children, block = true, message = "You must be an administrator to view this page." }: { children: React.ReactNode, block?: boolean, message?: string }) {
   const { isAdmin } = useAppContext();
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  if (!isClient) {
+    return block ? (
+        <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
+            <Card className="w-full max-w-md text-center">
+                <CardHeader>
+                    <Skeleton className="h-16 w-16 rounded-full mx-auto" />
+                    <Skeleton className="h-6 w-32 mt-4 mx-auto" />
+                </CardHeader>
+                <CardContent>
+                    <Skeleton className="h-4 w-full mb-6" />
+                    <Skeleton className="h-10 w-32 mx-auto" />
+                </CardContent>
+            </Card>
+        </div>
+    ) : (
+        <Card>
+            <CardHeader>
+                <Skeleton className="h-6 w-32" />
+            </CardHeader>
+            <CardContent>
+                <Skeleton className="h-4 w-full" />
+            </CardContent>
+        </Card>
+    );
+  }
 
   if (!isAdmin) {
     if (block) {
