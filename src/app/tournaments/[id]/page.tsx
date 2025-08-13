@@ -78,7 +78,7 @@ function PointsTable({ tournament, pointsTable }: { tournament: any, pointsTable
     );
 }
 
-function TournamentResult({ tournament, pointsTable, allPlayers }: { tournament: any, pointsTable: PointsTableEntry[], allPlayers: Player[] }) {
+function TournamentResult({ tournament, pointsTable, allPlayers, allMatches }: { tournament: any, pointsTable: PointsTableEntry[], allPlayers: Player[], allMatches: Match[] }) {
     if (tournament.status !== 'completed' || pointsTable.length === 0) {
         return null;
     }
@@ -89,10 +89,10 @@ function TournamentResult({ tournament, pointsTable, allPlayers }: { tournament:
     const playerStats: { [playerId: string]: { runs: number, wickets: number, name: string } } = {};
 
     allPlayers.forEach(p => {
-        playerStats[p.id] = { runs: 0, wickets: 0, name: p.name };
+        playerStats[p.id as string] = { runs: 0, wickets: 0, name: p.name };
     });
 
-    matches.filter(m => tournamentMatches.includes(m.id)).forEach(m => {
+    allMatches.filter(m => tournamentMatches.includes(m.id as string)).forEach(m => {
         if(m.scorecard) {
             Object.values(m.scorecard.inning1.batsmen).forEach(b => {
                 if(playerStats[b.playerId]) playerStats[b.playerId].runs += b.runs;
@@ -125,10 +125,10 @@ function TournamentResult({ tournament, pointsTable, allPlayers }: { tournament:
                     <p className="text-muted-foreground">Player of the Tournament</p>
                     <p className="text-2xl font-bold flex items-center justify-center gap-2">
                         <Award className="text-amber-500" /> 
-                        {playerOfTheTournament.name}
+                        {playerOfTheTournament?.name || "Not available"}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                        {playerOfTheTournament.runs} Runs & {playerOfTheTournament.wickets} Wickets
+                        {playerOfTheTournament?.runs || 0} Runs & {playerOfTheTournament?.wickets || 0} Wickets
                     </p>
                 </div>
             </CardContent>
@@ -300,7 +300,7 @@ export default function TournamentDetailPage() {
             <TabsContent value="teams">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-6">
                     <div className="lg:col-span-2 space-y-6">
-                        <TournamentResult tournament={tournament} pointsTable={pointsTable} allPlayers={players} />
+                        <TournamentResult tournament={tournament} pointsTable={pointsTable} allPlayers={players} allMatches={matches} />
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2"><Users /> Registered Teams ({tournament.teams.length})</CardTitle>
