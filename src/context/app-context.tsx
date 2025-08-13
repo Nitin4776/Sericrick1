@@ -99,7 +99,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         bestBowling: '0-0', 
         strikeRate: 0, 
         battingAverage: 0, 
-        bowlingEconomy: 0, 
         ballsFaced: 0, 
         oversBowled: 0, 
         runsConceded: 0,
@@ -218,7 +217,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const _updateScore = (runs: number, isWicket: boolean, isExtra: boolean, isLegalBall: boolean, isDeclared: boolean = false) => {
-    if(!liveMatch) return;
+    if(!liveMatch || !liveMatch.currentBatsmen.striker || !liveMatch.currentBowler) return;
+
     let match = { ...liveMatch };
     const currentInningData = match.scorecard![`inning${match.currentInning}` as 'inning1' | 'inning2'];
     const currentBattingTeam = match.teams.find(t => t.name === currentInningData.team)!;
@@ -226,13 +226,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     currentBattingTeam.runs += runs;
     if(isExtra) currentInningData.extraRuns += runs;
 
-    if(match.currentBowler){
-        const bowlerStats = currentInningData.bowlers[match.currentBowler.id] ||= {playerId: match.currentBowler.id as string, runs: 0, overs: 0, wickets: 0};
-        bowlerStats.runs += runs;
-    }
+    const bowlerStats = currentInningData.bowlers[match.currentBowler.id] ||= {playerId: match.currentBowler.id as string, runs: 0, overs: 0, wickets: 0};
+    bowlerStats.runs += runs;
 
-    if(match.currentBatsmen.striker && !isExtra) {
-        const batsmanStats = currentInningData.batsmen[match.currentBatsmen.striker.id] ||= {playerId: match.currentBatsmen.striker.id as string, runs: 0, balls: 0, fours: 0, sixes: 0, out: false};
+    const batsmanStats = currentInningData.batsmen[match.currentBatsmen.striker.id] ||= {playerId: match.currentBatsmen.striker.id as string, runs: 0, balls: 0, fours: 0, sixes: 0, out: false};
+    if(!isExtra) {
         batsmanStats.runs += runs;
         if(runs === 4) batsmanStats.fours +=1;
         if(runs === 6) batsmanStats.sixes +=1;
@@ -240,51 +238,33 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     if(isLegalBall) {
         match.ballsInOver += 1;
-        if(match.currentBatsmen.striker) {
-            const batsmanStats = currentInningData.batsmen[match.currentBatsmen.striker.id] ||= {playerId: match.currentBatsmen.striker.id as string, runs: 0, balls: 0, fours: 0, sixes: 0, out: false};
-            batsmanStats.balls +=1;
-        }
+        batsmanStats.balls +=1;
     }
 
     if(isWicket) {
         currentBattingTeam.wickets += 1;
-        if(match.currentBowler) {
-            const bowlerStats = currentInningData.bowlers[match.currentBowler.id] ||= {playerId: match.currentBowler.id as string, runs: 0, overs: 0, wickets: 0};
-            bowlerStats.wickets += 1;
-        }
-        if(match.currentBatsmen.striker) {
-             currentInningData.batsmen[match.currentBatsmen.striker.id].out = true;
-             const nextBatsmanIndex = currentBattingTeam.players.findIndex(p => p.id === match.currentBatsmen.striker!.id) + 1; // Simplistic
-             const nextBatsman = currentBattingTeam.players.find(p => !currentInningData.batsmen[p.id]?.out && p.id !== match.currentBatsmen.nonStriker?.id);
-             match.currentBatsmen.striker = nextBatsman || null;
-        }
+        bowlerStats.wickets += 1;
+        batsmanStats.out = true;
+        match.currentBatsmen.striker = null; // Prompt for new batsman
     } else if (runs % 2 !== 0 && !isExtra && !isDeclared) {
         [match.currentBatsmen.striker, match.currentBatsmen.nonStriker] = [match.currentBatsmen.nonStriker, match.currentBatsmen.striker];
     }
     
     if (match.ballsInOver === 6) {
         match.currentOver += 1;
-        currentBattingTeam.overs = Math.floor(match.currentOver) + (match.ballsInOver/10);
-        if(match.currentBowler) {
-            const bowlerStats = currentInningData.bowlers[match.currentBowler.id] ||= {playerId: match.currentBowler.id as string, runs: 0, overs: 0, wickets: 0};
-            bowlerStats.overs = Math.floor(bowlerStats.overs) + 1;
-        }
+        bowlerStats.overs = Math.floor(bowlerStats.overs) + 1;
         match.ballsInOver = 0;
+        // Rotate strike at end of over
         [match.currentBatsmen.striker, match.currentBatsmen.nonStriker] = [match.currentBatsmen.nonStriker, match.currentBatsmen.striker];
-        
-        const bowlingTeam = match.teams.find(t => t.name !== currentInningData.team)!;
-        const currentBowlerIndex = bowlingTeam.players.findIndex(p => p.id === match.currentBowler?.id);
-        const nextBowlerIndex = (currentBowlerIndex - 1 + bowlingTeam.players.length) % bowlingTeam.players.length; 
-        match.currentBowler = bowlingTeam.players[nextBowlerIndex];
+        match.currentBowler = null; // Prompt for new bowler
     } else {
-        currentBattingTeam.overs = match.currentOver + (match.ballsInOver * 0.1);
-        if(match.currentBowler){
-            const bowlerStats = currentInningData.bowlers[match.currentBowler.id] ||= {playerId: match.currentBowler.id as string, runs: 0, overs: 0, wickets: 0};
-            bowlerStats.overs = Math.floor(bowlerStats.overs) + (match.ballsInOver * 0.1);
-        }
+         bowlerStats.overs = parseFloat((Math.floor(bowlerStats.overs) + (match.ballsInOver / 10)).toFixed(1));
     }
 
-    if (currentBattingTeam.wickets === (currentBattingTeam.players.length - 1) || currentBattingTeam.overs >= match.overs) {
+    currentBattingTeam.overs = parseFloat((match.currentOver + (match.ballsInOver * 0.1)).toFixed(1));
+
+
+    if (currentBattingTeam.wickets === (currentBattingTeam.players.length - 1) || match.currentOver >= match.overs) {
         endInning();
     } else {
         updateLiveMatchInState(match);
@@ -305,13 +285,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     
     match.ballsInOver = 0;
     match.currentOver = 0;
+    match.currentBatsmen = { striker: null, nonStriker: null };
+    match.currentBowler = null;
 
     if (match.currentInning === 1) {
         match.currentInning = 2;
-        const battingTeam = match.teams.find(t => t.name === match.scorecard!.inning2.team)!;
-        const bowlingTeam = match.teams.find(t => t.name !== match.scorecard!.inning2.team)!;
-        match.currentBatsmen = { striker: battingTeam.players[0], nonStriker: battingTeam.players[1] };
-        match.currentBowler = bowlingTeam.players[bowlingTeam.players.length - 1];
         updateLiveMatchInState(match);
     } else {
         endMatch();
@@ -345,7 +323,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const playerRef = doc(db, "players", playerId as string);
         
         let runsScored = 0, ballsFaced = 0, wicketsTaken = 0, runsConceded = 0, oversBowled = 0;
-        let fours = 0, sixes = 0;
+        let isOut = false;
 
         const innings = [match.scorecard?.inning1, match.scorecard?.inning2];
         for (const inning of innings) {
@@ -353,8 +331,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 const batStats = inning.batsmen[playerId];
                 runsScored += batStats.runs;
                 ballsFaced += batStats.balls;
-                fours += batStats.fours;
-                sixes += batStats.sixes;
+                if(batStats.out) isOut = true;
             }
             if (inning?.bowlers[playerId]) {
                 const bowlStats = inning.bowlers[playerId];
@@ -372,11 +349,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const newWickets = (existingStats.wickets || 0) + wicketsTaken;
         const newOversBowled = (existingStats.oversBowled || 0) + oversBowled;
         const newRunsConceded = (existingStats.runsConceded || 0) + runsConceded;
-        
-        const timesOut = Object.values(match.scorecard?.inning1.batsmen || {}).filter(b => b.out && b.playerId === playerId).length +
-                         Object.values(match.scorecard?.inning2.batsmen || {}).filter(b => b.out && b.playerId === playerId).length;
-        const totalTimesOut = (existingStats.timesOut || 0) + timesOut;
-
+        const totalTimesOut = (existingStats.timesOut || 0) + (isOut ? 1 : 0);
 
         const updatedStats: PlayerStats = {
           matches: newMatches,
