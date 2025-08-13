@@ -4,16 +4,23 @@ import { useAppContext } from "@/context/app-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "../ui/skeleton";
 
 export function AuctionDashboard() {
   const { tournaments, auction, startAuction, placeBid } = useAppContext();
   const [selectedTournamentId, setSelectedTournamentId] = useState<string>('');
   const { toast } = useToast();
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
 
   const handleStartAuction = () => {
     if (selectedTournamentId) {
@@ -42,6 +49,20 @@ export function AuctionDashboard() {
     }
   };
 
+  if (!isClient) {
+    return (
+        <Card>
+            <CardHeader>
+                <Skeleton className="h-8 w-1/2" />
+                <Skeleton className="h-4 w-3/4" />
+            </CardHeader>
+            <CardContent>
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-32 mt-4" />
+            </CardContent>
+        </Card>
+    )
+  }
 
   if (!auction) {
     return (
