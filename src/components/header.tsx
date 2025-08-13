@@ -52,8 +52,11 @@ export function Header() {
   return (
     <header className="bg-card rounded-lg shadow-lg p-3 sm:p-4 flex items-center justify-between mb-4 sm:mb-6 sticky top-2 sm:top-4 z-50 max-w-7xl mx-auto">
       <Link href="/" className="flex items-center gap-2">
-        <Image src="https://firebasestorage.googleapis.com/v0/b/cricklive-tb354.firebasestorage.app/o/ChatGPT%20Image%20Aug%2011%2C%202025%2C%2011_16_22%20AM.png?alt=media&token=7cf241c1-5e7d-45df-97f2-b861f07a1c1b" alt="CrickSeries Logo" width={32} height={32} className="h-8 w-8 text-primary" />
-        <h1 className="text-xl sm:text-3xl font-bold text-primary">SeriCrick</h1>
+        <Image src="https://firebasestorage.googleapis.com/v0/b/cricklive-tb354.firebasestorage.app/o/ChatGPT%20Image%20Aug%2011%2C%202025%2C%2011_16_22%20AM.png?alt=media&token=7cf241c1-5e7d-45df-97f2-b861f07a1c1b" alt="CrickSeries Logo" width={40} height={40} className="h-10 w-10 text-primary" />
+        <div>
+          <h1 className="text-xl sm:text-3xl font-bold text-primary">SeriCrick</h1>
+          <p className="text-xs text-muted-foreground">Serious Cricketers.</p>
+        </div>
       </Link>
       
       {/* Desktop Navigation */}
