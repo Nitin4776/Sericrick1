@@ -390,7 +390,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     updateLiveMatchInState(match);
   };
 
-  const _updateScore = (runs: number, isWicket: boolean, isExtra: boolean, isLegalBall: boolean, isDeclared: boolean = false) => {
+  const _updateScore = (runs: number, isWicket: boolean, isExtra: boolean, isLegalBall: boolean, isDeclared: boolean = false, isRunOut: boolean = false) => {
     if(!liveMatch || !liveMatch.currentBatsmen.striker || !liveMatch.currentBowler) return;
 
     let match = { ...liveMatch };
@@ -402,6 +402,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const currentBattingTeam = match.teams.find(t => t.name === currentInningData.team)!;
 
     let event = isWicket ? 'W' : `${runs}`;
+    if (isRunOut) {
+        event = 'W';
+    }
     if (isExtra) event += 'wd'; // simplified for now
     match.overEvents.push(event);
     
@@ -427,7 +430,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     if(isWicket) {
         currentBattingTeam.wickets += 1;
-        bowlerStats.wickets += 1;
+        if (!isRunOut) {
+            bowlerStats.wickets += 1;
+        }
         batsmanStats.status = 'out';
         if (wasLastBallOfOver) {
             match.currentBatsmen.striker = null;
@@ -483,34 +488,33 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const scoreRun = (runs: number, isDeclared: boolean = false) => _updateScore(runs, false, false, true, isDeclared);
-  const scoreWicket = () => _updateScore(0, true, false, true);
+  const scoreWicket = () => _updateScore(0, true, false, true, false, false);
   const scoreExtra = (type: 'Wide' | 'No Ball') => {
     const isLegal = type === 'No Ball';
     _updateScore(1, false, true, isLegal);
   }
 
-  const handleDismissal = (batsmanType: 'striker' | 'non-striker', runs: number, dismissalStatus: BatsmanStatus) => {
+  const handleDismissal = (batsmanType: 'striker' | 'non-striker', runs: number, dismissalStatus: BatsmanStatus, isRunOut: boolean = false) => {
     if (!liveMatch || !liveMatch.currentBowler) return;
-    let match = { ...liveMatch };
+    
+    // Process runs first, and flag it as a run-out wicket event for display
+    _updateScore(runs, true, false, true, false, isRunOut);
+    
+    // We need to get the latest state after _updateScore runs, as it modifies it
+    const match = { ...liveMatch! }; 
 
     const batsmanToDismiss = match.currentBatsmen[batsmanType];
     if (!batsmanToDismiss) return;
     
-    // Process runs first
-    _updateScore(runs, false, false, true);
-    match = liveMatch ? { ...liveMatch } : match; // Refresh match state after update
-
     const currentInningData = match.scorecard![`inning${match.currentInning}` as 'inning1' | 'inning2'];
     const currentBattingTeam = match.teams.find(t => t.name === currentInningData.team)!;
     
     const batsmanStats = currentInningData.batsmen[batsmanToDismiss.id] ||= { playerId: batsmanToDismiss.id as string, runs: 0, balls: 0, fours: 0, sixes: 0, status: 'not_out' };
     batsmanStats.status = dismissalStatus;
     
+    // Wicket count was already incremented in _updateScore, so we just set the batsman status
     if (dismissalStatus === 'out') {
-      currentBattingTeam.wickets += 1;
-      currentInningData.wickets += 1;
-      const bowlerStats = currentInningData.bowlers[match.currentBowler.id] ||= { playerId: match.currentBowler.id as string, runs: 0, overs: 0, wickets: 0 };
-      bowlerStats.wickets += 1;
+      currentBattingTeam.wickets = currentInningData.wickets; // Sync team wickets
     }
     
     match.currentBatsmen[batsmanType] = null; // Vacate the spot
@@ -519,11 +523,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const handleRunOut = (batsmanOut: 'striker' | 'non-striker', runsCompleted: number) => {
-    handleDismissal(batsmanOut, runsCompleted, 'out');
+    handleDismissal(batsmanOut, runsCompleted, 'out', true);
   };
 
   const handleRetire = (batsmanRetired: 'striker' | 'non-striker') => {
-    handleDismissal(batsmanRetired, 0, 'retired');
+    handleDismissal(batsmanRetired, 0, 'retired', false);
   };
 
   const endInning = () => {
