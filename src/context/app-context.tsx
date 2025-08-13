@@ -230,6 +230,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const currentInningData = match.scorecard![`inning${match.currentInning}` as 'inning1' | 'inning2'];
     const currentBattingTeam = match.teams.find(t => t.name === currentInningData.team)!;
     
+    if (!match.overEvents) {
+      match.overEvents = [];
+    }
+
     // Add event to over history
     let event = isWicket ? 'W' : `${runs}`;
     if (isExtra) event += 'wd'; // simplified for now
@@ -482,3 +486,5 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
+
+    
