@@ -121,12 +121,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const startScoringMatch = (matchId: string) => {
     const match = matches.find(m => m.id === matchId);
-    if (!match) return;
-
+    if (!match || !players.length) return;
+  
+    // Function to get full player object from an ID
+    const getPlayerById = (id: string | Player) => {
+        if (typeof id === 'object' && id !== null) return id; // Already a player object
+        return players.find(p => p.id === id);
+    }
+  
     // Find the full player objects for each team
-    const team1Players = match.teams[0].players.map(p_id => players.find(p => p.id === p_id)).filter(p => p) as Player[];
-    const team2Players = match.teams[1].players.map(p_id => players.find(p => p.id === p_id)).filter(p => p) as Player[];
-
+    const team1Players = match.teams[0].players.map(p_id => getPlayerById(p_id as string)).filter(p => p) as Player[];
+    const team2Players = match.teams[1].players.map(p_id => getPlayerById(p_id as string)).filter(p => p) as Player[];
+  
     const liveMatchData: LiveMatch = {
       ...JSON.parse(JSON.stringify(match)), // Deep copy to avoid mutation issues
       teams: [
@@ -189,12 +195,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if(isExtra) currentInningData.extraRuns += runs;
 
     if(match.currentBowler){
-        const bowlerStats = currentInningData.bowlers[match.currentBowler.id] ||= {playerId: match.currentBowler.id, runs: 0, overs: 0, wickets: 0};
+        const bowlerStats = currentInningData.bowlers[match.currentBowler.id] ||= {playerId: match.currentBowler.id as string, runs: 0, overs: 0, wickets: 0};
         bowlerStats.runs += runs;
     }
 
     if(match.currentBatsmen.striker && !isExtra) {
-        const batsmanStats = currentInningData.batsmen[match.currentBatsmen.striker.id] ||= {playerId: match.currentBatsmen.striker.id, runs: 0, balls: 0, fours: 0, sixes: 0, out: false};
+        const batsmanStats = currentInningData.batsmen[match.currentBatsmen.striker.id] ||= {playerId: match.currentBatsmen.striker.id as string, runs: 0, balls: 0, fours: 0, sixes: 0, out: false};
         batsmanStats.runs += runs;
         if(runs === 4) batsmanStats.fours +=1;
         if(runs === 6) batsmanStats.sixes +=1;
@@ -203,7 +209,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if(isLegalBall) {
         match.ballsInOver += 1;
         if(match.currentBatsmen.striker) {
-            const batsmanStats = currentInningData.batsmen[match.currentBatsmen.striker.id] ||= {playerId: match.currentBatsmen.striker.id, runs: 0, balls: 0, fours: 0, sixes: 0, out: false};
+            const batsmanStats = currentInningData.batsmen[match.currentBatsmen.striker.id] ||= {playerId: match.currentBatsmen.striker.id as string, runs: 0, balls: 0, fours: 0, sixes: 0, out: false};
             batsmanStats.balls +=1;
         }
     }
@@ -211,7 +217,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if(isWicket) {
         currentBattingTeam.wickets += 1;
         if(match.currentBowler) {
-            const bowlerStats = currentInningData.bowlers[match.currentBowler.id] ||= {playerId: match.currentBowler.id, runs: 0, overs: 0, wickets: 0};
+            const bowlerStats = currentInningData.bowlers[match.currentBowler.id] ||= {playerId: match.currentBowler.id as string, runs: 0, overs: 0, wickets: 0};
             bowlerStats.wickets += 1;
         }
         if(match.currentBatsmen.striker) {
@@ -228,7 +234,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         match.currentOver += 1;
         currentBattingTeam.overs = Math.floor(match.currentOver) + (match.ballsInOver/10);
         if(match.currentBowler) {
-            const bowlerStats = currentInningData.bowlers[match.currentBowler.id] ||= {playerId: match.currentBowler.id, runs: 0, overs: 0, wickets: 0};
+            const bowlerStats = currentInningData.bowlers[match.currentBowler.id] ||= {playerId: match.currentBowler.id as string, runs: 0, overs: 0, wickets: 0};
             bowlerStats.overs = Math.floor(bowlerStats.overs) + 1;
         }
         match.ballsInOver = 0;
@@ -241,7 +247,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     } else {
         currentBattingTeam.overs = match.currentOver + (match.ballsInOver * 0.1);
         if(match.currentBowler){
-            const bowlerStats = currentInningData.bowlers[match.currentBowler.id] ||= {playerId: match.currentBowler.id, runs: 0, overs: 0, wickets: 0};
+            const bowlerStats = currentInningData.bowlers[match.currentBowler.id] ||= {playerId: match.currentBowler.id as string, runs: 0, overs: 0, wickets: 0};
             bowlerStats.overs = Math.floor(bowlerStats.overs) + (match.ballsInOver * 0.1);
         }
     }
@@ -358,4 +364,5 @@ export const useAppContext = (): AppContextType => {
   return context;
 };
 
+    
     
