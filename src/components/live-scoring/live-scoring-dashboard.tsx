@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useEffect, useState } from "react";
-import type { Match, Player, ScorecardInning } from "@/lib/types";
+import type { Match, Player, ScorecardInning, LiveMatch } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Coins, User, Shield, Info, ArrowLeft, BarChart, Users, Trophy } from "lucide-react";
 import { Skeleton } from "../ui/skeleton";
@@ -293,7 +293,13 @@ function DismissalDialog({ open, onOpenChange, onConfirm, liveMatch, type }: { o
                   {type === 'Run Out' && (
                     <div>
                       <Label>Runs Completed</Label>
-                      <Input type="number" value={runs} onChange={e => setRuns(parseInt(e.target.value))} min={0} max={6} />
+                      <Input 
+                        type="number" 
+                        value={runs} 
+                        onChange={e => setRuns(parseInt(e.target.value) || 0)} 
+                        min={0} 
+                        max={6} 
+                      />
                     </div>
                   )}
                 </div>
