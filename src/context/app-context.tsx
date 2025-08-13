@@ -316,23 +316,30 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const batch = writeBatch(db);
     const allPlayerIdsInMatch = [...new Set([...match.teams[0].players.map(p => p.id), ...match.teams[1].players.map(p => p.id)])];
     
+    const updatedPlayers: Player[] = [];
+    
     for (const playerId of allPlayerIdsInMatch) {
       const player = players.find(p => p.id === playerId);
       if (player) {
         const playerRef = doc(db, "players", playerId as string);
         
         let runsScored = 0, ballsFaced = 0, wicketsTaken = 0, runsConceded = 0, oversBowled = 0;
+        let fours = 0, sixes = 0;
 
         const innings = [match.scorecard?.inning1, match.scorecard?.inning2];
         for (const inning of innings) {
             if (inning?.batsmen[playerId]) {
-                runsScored += inning.batsmen[playerId].runs;
-                ballsFaced += inning.batsmen[playerId].balls;
+                const batStats = inning.batsmen[playerId];
+                runsScored += batStats.runs;
+                ballsFaced += batStats.balls;
+                fours += batStats.fours;
+                sixes += batStats.sixes;
             }
             if (inning?.bowlers[playerId]) {
-                wicketsTaken += inning.bowlers[playerId].wickets;
-                runsConceded += inning.bowlers[playerId].runs;
-                oversBowled += inning.bowlers[playerId].overs;
+                const bowlStats = inning.bowlers[playerId];
+                wicketsTaken += bowlStats.wickets;
+                runsConceded += bowlStats.runs;
+                oversBowled += bowlStats.overs;
             }
         }
         
@@ -347,7 +354,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         
         const timesOut = Object.values(match.scorecard?.inning1.batsmen || {}).filter(b => b.out && b.playerId === playerId).length +
                          Object.values(match.scorecard?.inning2.batsmen || {}).filter(b => b.out && b.playerId === playerId).length;
-        const totalTimesOut = (player.stats.timesOut || 0) + timesOut;
+        const totalTimesOut = (existingStats.timesOut || 0) + timesOut;
 
 
         const updatedStats: PlayerStats = {
@@ -359,16 +366,25 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           runsConceded: newRunsConceded,
           timesOut: totalTimesOut,
           bestScore: Math.max(existingStats.bestScore || 0, runsScored),
-          bestBowling: existingStats.bestBowling,
+          bestBowling: existingStats.bestBowling, // Note: Best bowling logic needs to be implemented
           battingAverage: totalTimesOut > 0 ? newRuns / totalTimesOut : newRuns,
           strikeRate: newBallsFaced > 0 ? (newRuns / newBallsFaced) * 100 : 0,
           bowlingEconomy: newOversBowled > 0 ? newRunsConceded / newOversBowled : 0,
         };
+
         batch.update(playerRef, { stats: updatedStats });
+        updatedPlayers.push({ ...player, stats: updatedStats });
       }
     }
     
     await batch.commit();
+
+    setPlayers(currentPlayers => 
+        currentPlayers.map(p => {
+            const updatedPlayer = updatedPlayers.find(up => up.id === p.id);
+            return updatedPlayer || p;
+        })
+    );
 
     const matchRef = doc(db, "matches", match.id as string);
     await updateDoc(matchRef, { ...match, scorecard: match.scorecard, result: match.result, status: match.status });
@@ -377,11 +393,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const calculateRankings = () => {
         const playersWithStats = players.filter(p => p.stats && p.stats.matches > 0);
-        const bestBatsmen = [...playersWithStats].sort((a, b) => (b.stats.runs || 0) - (a.stats.runs || 0)).slice(0, 5);
-        const bestBowlers = [...playersWithStats].sort((a, b) => (b.stats.wickets || 0) - (a.stats.wickets || 0)).slice(0, 5);
+        const bestBatsmen = [...playersWithStats].sort((a, b) => (b.stats?.runs || 0) - (a.stats?.runs || 0)).slice(0, 5);
+        const bestBowlers = [...playersWithStats].sort((a, b) => (b.stats?.wickets || 0) - (a.stats?.wickets || 0)).slice(0, 5);
         const bestAllrounders = [...playersWithStats]
-            .filter(p => (p.stats.runs || 0) > 0 && (p.stats.wickets || 0) > 0)
-            .sort((a, b) => ((b.stats.runs || 0) * 0.4 + (b.stats.wickets || 0) * 20) - ((a.stats.runs || 0) * 0.4 + (a.stats.wickets || 0) * 20)).slice(0, 5);
+            .filter(p => (p.stats?.runs || 0) > 0 && (p.stats?.wickets || 0) > 0)
+            .sort((a, b) => ((b.stats?.runs || 0) * 0.4 + (b.stats?.wickets || 0) * 20) - ((a.stats?.runs || 0) * 0.4 + (a.stats?.wickets || 0) * 20)).slice(0, 5);
         return { bestBatsmen, bestBowlers, bestAllrounders };
   }
   

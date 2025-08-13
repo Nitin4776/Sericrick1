@@ -25,14 +25,12 @@ const InningScorecard = ({ inningData, battingTeamName, bowlingTeamName }: { inn
     const getPlayerName = (id: string) => players.find(p => p.id === id)?.name || 'Unknown Player';
 
     const batsmen = Object.values(inningData.batsmen).filter(b => b.balls > 0 || b.runs > 0);
-    const bowlers = Object.values(inningData.bowlers).filter(b => b.overs > 0 || b.wickets > 0);
-
-    const battingTeamData = inningData.team === battingTeamName ? { name: battingTeamName } : { name: bowlingTeamName };
+    const bowlers = Object.values(inningData.bowlers).filter(b => b.overs > 0 || b.wickets > 0 || b.runs > 0);
 
     return (
         <div className="space-y-6">
             <div>
-                <h4 className="font-semibold text-lg">{battingTeamData.name} Innings</h4>
+                <h4 className="font-semibold text-lg">{battingTeamName} Innings</h4>
                 <p className="text-muted-foreground">{inningData.team}</p>
             </div>
             <div>
@@ -94,6 +92,10 @@ const InningScorecard = ({ inningData, battingTeamName, bowlingTeamName }: { inn
 export function ScorecardDialog({ match, isOpen, onOpenChange }: ScorecardDialogProps) {
   if (!match) return null;
 
+  const getPlayerName = (players: Player[], id: string) => players.find(p => p.id === id)?.name || id;
+
+  const playerOfTheMatchName = match.playerOfTheMatch ? getPlayerName(match.teams[0].players.concat(match.teams[1].players), match.playerOfTheMatch) : '';
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl">
@@ -101,7 +103,7 @@ export function ScorecardDialog({ match, isOpen, onOpenChange }: ScorecardDialog
           <DialogTitle>Scorecard: {match.teams[0].name} vs {match.teams[1].name}</DialogTitle>
           <DialogDescription>
             {match.result}
-            {match.playerOfTheMatch && ` | Player of the Match: ${match.playerOfTheMatch}`}
+            {match.playerOfTheMatch && ` | Player of the Match: ${playerOfTheMatchName}`}
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="h-[60vh] p-4">
