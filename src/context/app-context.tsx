@@ -29,6 +29,7 @@ type AppContextType = AppData & {
   scheduleTournament: (tournamentData: Omit<Tournament, 'id' | 'teams' | 'status'>) => Promise<void>;
   deleteTournament: (tournamentId: string) => Promise<void>;
   startScoringMatch: (matchId: string) => void;
+  leaveLiveMatch: () => void;
   performToss: () => void;
   selectTossOption: (option: 'Bat' | 'Bowl') => void;
   scoreRun: (runs: number, isDeclared?: boolean) => void;
@@ -163,10 +164,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       currentInning: 1,
       currentBatsmen: { striker: null, nonStriker: null },
       currentBowler: null,
+      previousBowlerId: null,
       currentOver: 0,
       ballsInOver: 0,
+      overEvents: [],
     };
     setLiveMatch(liveMatchData);
+  };
+
+  const leaveLiveMatch = () => {
+    setLiveMatch(null);
   };
   
   const updateLiveMatchInState = (liveMatchData: LiveMatch | null) => {
@@ -196,11 +203,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const setLivePlayers = (strikerId: string, nonStrikerId: string, bowlerId: string) => {
-    if (!liveMatch || !liveMatch.scorecard?.inning1.team) return;
+    if (!liveMatch) return;
 
     let match = { ...liveMatch };
 
-    const battingTeamName = match.scorecard[`inning${match.currentInning}` as 'inning1' | 'inning2'].team;
+    const battingTeamName = match.scorecard?.[`inning${match.currentInning}` as 'inning1' | 'inning2'].team;
     const battingTeam = match.teams.find(t => t.name === battingTeamName);
     const bowlingTeam = match.teams.find(t => t.name !== battingTeamName);
 
@@ -223,8 +230,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const currentInningData = match.scorecard![`inning${match.currentInning}` as 'inning1' | 'inning2'];
     const currentBattingTeam = match.teams.find(t => t.name === currentInningData.team)!;
     
+    // Add event to over history
+    let event = isWicket ? 'W' : `${runs}`;
+    if (isExtra) event += 'wd'; // simplified for now
+    match.overEvents.push(event);
+    
     currentBattingTeam.runs += runs;
-    if(isExtra) currentInningData.extraRuns += runs;
+    if(isExtra) currentInningData.extraRuns += (runs);
 
     const bowlerStats = currentInningData.bowlers[match.currentBowler.id] ||= {playerId: match.currentBowler.id as string, runs: 0, overs: 0, wickets: 0};
     bowlerStats.runs += runs;
@@ -252,10 +264,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     
     if (match.ballsInOver === 6) {
         match.currentOver += 1;
-        bowlerStats.overs = Math.floor(bowlerStats.overs) + 1;
+        bowlerStats.overs = parseFloat((Math.floor(bowlerStats.overs) + 1).toFixed(1));
         match.ballsInOver = 0;
+        match.overEvents = []; // Clear events for next over
+        
         // Rotate strike at end of over
         [match.currentBatsmen.striker, match.currentBatsmen.nonStriker] = [match.currentBatsmen.nonStriker, match.currentBatsmen.striker];
+        
+        match.previousBowlerId = match.currentBowler.id;
         match.currentBowler = null; // Prompt for new bowler
     } else {
          bowlerStats.overs = parseFloat((Math.floor(bowlerStats.overs) + (match.ballsInOver / 10)).toFixed(1));
@@ -273,7 +289,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const scoreRun = (runs: number, isDeclared: boolean = false) => _updateScore(runs, false, false, true, isDeclared);
   const scoreWicket = () => _updateScore(0, true, false, true);
-  const scoreExtra = (type: 'Wide' | 'No Ball') => _updateScore(1, false, true, type === 'No Ball');
+  const scoreExtra = (type: 'Wide' | 'No Ball') => {
+    const isLegal = type === 'No Ball'; // No ball is a legal delivery in some formats for runs, but doesn't count to over. Here we make it not count.
+    _updateScore(1, false, true, isLegal);
+  }
 
   const endInning = () => {
     if(!liveMatch) return;
@@ -281,12 +300,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     
     const currentInningLabel = `inning${match.currentInning}` as 'inning1' | 'inning2';
     const currentInningTeamName = match.scorecard![currentInningLabel].team;
-    match.teams.find(t => t.name === currentInningTeamName)!.inningCompleted = true;
+    const team = match.teams.find(t => t.name === currentInningTeamName);
+    if(team) team.inningCompleted = true;
     
     match.ballsInOver = 0;
     match.currentOver = 0;
+    match.overEvents = [];
     match.currentBatsmen = { striker: null, nonStriker: null };
     match.currentBowler = null;
+    match.previousBowlerId = null;
 
     if (match.currentInning === 1) {
         match.currentInning = 2;
@@ -371,8 +393,24 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
     }
     
+    const finalMatchData: Partial<Match> = {
+        ...match,
+        scorecard: match.scorecard || null,
+        result: match.result,
+        status: match.status,
+    }
+    delete (finalMatchData as any).currentBatsmen;
+    delete (finalMatchData as any).currentBowler;
+    delete (finalMatchData as any).currentInning;
+    delete (finalMatchData as any).currentOver;
+    delete (finalMatchData as any).ballsInOver;
+    delete (finalMatchData as any).overEvents;
+    delete (finalMatchData as any).previousBowlerId;
+    delete (finalMatchData as any).tossWinner;
+
+
     const matchRef = doc(db, "matches", match.id as string);
-    batch.update(matchRef, { ...match, scorecard: match.scorecard, result: match.result, status: match.status });
+    batch.update(matchRef, finalMatchData);
     
     await batch.commit();
 
@@ -431,7 +469,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const appData = { isAdmin, players, matches, tournaments, liveMatch, auction };
 
   return (
-    <AppContext.Provider value={{ ...appData, login, logout, addPlayer, scheduleMatch, deleteMatch, scheduleTournament, deleteTournament, startScoringMatch, performToss, selectTossOption, scoreRun, scoreWicket, scoreExtra, endMatch, calculateRankings, updateLiveMatchInState, startAuction, placeBid, setLivePlayers }}>
+    <AppContext.Provider value={{ ...appData, login, logout, addPlayer, scheduleMatch, deleteMatch, scheduleTournament, deleteTournament, startScoringMatch, leaveLiveMatch, performToss, selectTossOption, scoreRun, scoreWicket, scoreExtra, endMatch, calculateRankings, updateLiveMatchInState, startAuction, placeBid, setLivePlayers }}>
       {children}
     </AppContext.Provider>
   );

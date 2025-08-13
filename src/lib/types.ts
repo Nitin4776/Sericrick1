@@ -80,8 +80,10 @@ export interface LiveMatch extends Match {
     nonStriker: Player | null;
   };
   currentBowler: Player | null;
+  previousBowlerId: string | number | null;
   currentOver: number;
   ballsInOver: number;
+  overEvents: string[];
 }
 
 export interface Tournament {
@@ -119,5 +121,3 @@ export interface AppData {
   liveMatch: LiveMatch | null;
   auction: Auction | null;
 }
-
-    

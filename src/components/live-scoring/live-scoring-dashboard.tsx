@@ -9,9 +9,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useEffect, useState } from "react";
 import type { Match, Player } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Coins, User, Shield, Info } from "lucide-react";
+import { Coins, User, Shield, Info, ArrowLeft } from "lucide-react";
 import { Skeleton } from "../ui/skeleton";
 import { Label } from "../ui/label";
+import { Badge } from "../ui/badge";
+
+function PlayerSelectionCard({ title, children }: { title: string, children: React.ReactNode }) {
+    return (
+        <Card>
+            <CardHeader><CardTitle>{title}</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+                {children}
+            </CardContent>
+        </Card>
+    );
+}
 
 function PlayerSelector({ players, selectedPlayer, onSelect, otherSelectedPlayer, label, disabled = false, availablePlayers }: { players: Player[], selectedPlayer: Player | null, onSelect: (id: string) => void, otherSelectedPlayer?: Player | null, label: string, disabled?: boolean, availablePlayers?: Player[] }) {
     const playerList = availablePlayers || players;
@@ -29,7 +41,7 @@ function PlayerSelector({ players, selectedPlayer, onSelect, otherSelectedPlayer
                 </SelectContent>
             </Select>
         </div>
-    )
+    );
 }
 
 function PlayerSetup({ onConfirm }: { onConfirm: (strikerId: string, nonStrikerId: string, bowlerId: string) => void }) {
@@ -49,31 +61,28 @@ function PlayerSetup({ onConfirm }: { onConfirm: (strikerId: string, nonStrikerI
     const availableBatsmen = battingTeam.players.filter(p => !currentInningData.batsmen[p.id]?.out);
     
     return (
-         <Card>
-            <CardHeader><CardTitle>Set Players</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-                <PlayerSelector 
-                    players={battingTeam.players}
-                    availablePlayers={availableBatsmen} 
-                    label="On-Strike Batsman" 
-                    selectedPlayer={battingTeam.players.find(p => p.id === strikerId) || null} 
-                    onSelect={setStrikerId} 
-                    otherSelectedPlayer={battingTeam.players.find(p => p.id === nonStrikerId) || null}/>
-                <PlayerSelector 
-                    players={battingTeam.players}
-                    availablePlayers={availableBatsmen} 
-                    label="Non-Strike Batsman" 
-                    selectedPlayer={battingTeam.players.find(p => p.id === nonStrikerId) || null} 
-                    onSelect={setNonStrikerId} 
-                    otherSelectedPlayer={battingTeam.players.find(p => p.id === strikerId) || null}/>
-                <PlayerSelector 
-                    players={bowlingTeam.players} 
-                    label="Bowler" 
-                    selectedPlayer={bowlingTeam.players.find(p => p.id === bowlerId) || null} 
-                    onSelect={setBowlerId} />
-                <Button onClick={() => onConfirm(strikerId, nonStrikerId, bowlerId)} disabled={!strikerId || !nonStrikerId || !bowlerId}>Confirm Players</Button>
-            </CardContent>
-        </Card>
+        <PlayerSelectionCard title="Set Players for Inning">
+            <PlayerSelector 
+                players={battingTeam.players}
+                availablePlayers={availableBatsmen} 
+                label="On-Strike Batsman" 
+                selectedPlayer={battingTeam.players.find(p => p.id === strikerId) || null} 
+                onSelect={setStrikerId} 
+                otherSelectedPlayer={battingTeam.players.find(p => p.id === nonStrikerId) || null}/>
+            <PlayerSelector 
+                players={battingTeam.players}
+                availablePlayers={availableBatsmen} 
+                label="Non-Strike Batsman" 
+                selectedPlayer={battingTeam.players.find(p => p.id === nonStrikerId) || null} 
+                onSelect={setNonStrikerId} 
+                otherSelectedPlayer={battingTeam.players.find(p => p.id === strikerId) || null}/>
+            <PlayerSelector 
+                players={bowlingTeam.players} 
+                label="Bowler" 
+                selectedPlayer={bowlingTeam.players.find(p => p.id === bowlerId) || null} 
+                onSelect={setBowlerId} />
+            <Button onClick={() => onConfirm(strikerId, nonStrikerId, bowlerId)} disabled={!strikerId || !nonStrikerId || !bowlerId}>Confirm Players</Button>
+        </PlayerSelectionCard>
     );
 }
 
@@ -91,21 +100,18 @@ function NewBatsmanSelector({ onConfirm }: { onConfirm: (strikerId: string) => v
     const availableBatsmen = battingTeam.players.filter(p => !currentInningData.batsmen[p.id]?.out && p.id !== liveMatch.currentBatsmen.nonStriker?.id);
 
     return (
-        <Card>
-            <CardHeader><CardTitle>Wicket! Select New Batsman</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-                 <PlayerSelector 
-                    players={battingTeam.players} 
-                    availablePlayers={availableBatsmen}
-                    label="New Batsman" 
-                    selectedPlayer={battingTeam.players.find(p => p.id === newStrikerId) || null} 
-                    onSelect={setNewStrikerId}
-                    otherSelectedPlayer={liveMatch.currentBatsmen.nonStriker}
-                />
-                <Button onClick={() => onConfirm(newStrikerId)} disabled={!newStrikerId}>Confirm Batsman</Button>
-            </CardContent>
-        </Card>
-    )
+        <PlayerSelectionCard title="Wicket! Select New Batsman">
+             <PlayerSelector 
+                players={battingTeam.players} 
+                availablePlayers={availableBatsmen}
+                label="New Batsman" 
+                selectedPlayer={battingTeam.players.find(p => p.id === newStrikerId) || null} 
+                onSelect={setNewStrikerId}
+                otherSelectedPlayer={liveMatch.currentBatsmen.nonStriker}
+            />
+            <Button onClick={() => onConfirm(newStrikerId)} disabled={!newStrikerId}>Confirm Batsman</Button>
+        </PlayerSelectionCard>
+    );
 }
 
 function NewBowlerSelector({ onConfirm }: { onConfirm: (bowlerId: string) => void }) {
@@ -119,25 +125,26 @@ function NewBowlerSelector({ onConfirm }: { onConfirm: (bowlerId: string) => voi
     
     if (!bowlingTeam) return null;
 
+    // Prevent the previous bowler from bowling consecutive overs
+    const availableBowlers = bowlingTeam.players.filter(p => p.id !== liveMatch.previousBowlerId);
+
     return (
-        <Card>
-            <CardHeader><CardTitle>End of Over! Select New Bowler</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-                 <PlayerSelector 
-                    players={bowlingTeam.players} 
-                    label="New Bowler" 
-                    selectedPlayer={bowlingTeam.players.find(p => p.id === newBowlerId) || null} 
-                    onSelect={setNewBowlerId}
-                />
-                <Button onClick={() => onConfirm(newBowlerId)} disabled={!newBowlerId}>Confirm Bowler</Button>
-            </CardContent>
-        </Card>
-    )
+        <PlayerSelectionCard title="End of Over! Select New Bowler">
+             <PlayerSelector 
+                players={bowlingTeam.players}
+                availablePlayers={availableBowlers}
+                label="New Bowler" 
+                selectedPlayer={bowlingTeam.players.find(p => p.id === newBowlerId) || null} 
+                onSelect={setNewBowlerId}
+            />
+            <Button onClick={() => onConfirm(newBowlerId)} disabled={!newBowlerId}>Confirm Bowler</Button>
+        </PlayerSelectionCard>
+    );
 }
 
 
 export function LiveScoringDashboard() {
-  const { matches, liveMatch, startScoringMatch, performToss, selectTossOption, scoreRun, scoreWicket, scoreExtra, endMatch, setLivePlayers, players } = useAppContext();
+  const { matches, liveMatch, startScoringMatch, performToss, selectTossOption, scoreRun, scoreWicket, scoreExtra, endMatch, setLivePlayers, players, leaveLiveMatch } = useAppContext();
   const router = useRouter();
   const [selectedMatchId, setSelectedMatchId] = useState<string>('');
   const [isClient, setIsClient] = useState(false);
@@ -164,6 +171,7 @@ export function LiveScoringDashboard() {
 
   const handleSetNewBowler = (bowlerId: string) => {
     if (liveMatch?.currentBatsmen.striker && liveMatch?.currentBatsmen.nonStriker) {
+      // The strike has already rotated in the state, so we use the new striker/non-striker
       setLivePlayers(liveMatch.currentBatsmen.striker.id as string, liveMatch.currentBatsmen.nonStriker.id as string, bowlerId);
     }
   };
@@ -172,7 +180,7 @@ export function LiveScoringDashboard() {
 
   if (!isClient) {
     return (
-        <Card className="max-w-2xl mx-auto">
+        <Card className="max-w-4xl mx-auto">
             <CardHeader>
                 <Skeleton className="h-8 w-48" />
                 <Skeleton className="h-4 w-64" />
@@ -211,38 +219,18 @@ export function LiveScoringDashboard() {
   }
   
   const currentInningData = liveMatch.scorecard?.[`inning${liveMatch.currentInning}` as 'inning1' | 'inning2'];
-  const battingTeam = liveMatch.teams.find(t => t.name === currentInningData?.team);
-  const bowlingTeam = liveMatch.teams.find(t => t.name !== currentInningData?.team);
+  
   const arePlayersSet = liveMatch.currentBatsmen.striker && liveMatch.currentBatsmen.nonStriker && liveMatch.currentBowler;
   const isWicketFallen = liveMatch.currentBatsmen.striker === null && liveMatch.currentBatsmen.nonStriker !== null;
-  const isOverFinished = liveMatch.currentBowler === null && liveMatch.ballsInOver === 0 && liveMatch.currentOver > 0;
+  const isOverFinished = liveMatch.currentBowler === null && liveMatch.ballsInOver === 0 && (liveMatch.currentOver > 0 || (liveMatch.currentOver === 0 && liveMatch.currentInning === 2)); // End of over
   
-  const isSecondInningStarting = liveMatch.currentInning === 2 && !arePlayersSet;
-  const isFirstInningStarting = liveMatch.currentInning === 1 && liveMatch.scorecard?.inning1.team && !arePlayersSet;
+  const inningStarted = !!currentInningData?.team;
+  const isMatchStarting = !inningStarted;
+  const isInningStarting = inningStarted && !arePlayersSet && !isWicketFallen && !isOverFinished;
 
-
-  return (
-    <div className="space-y-6">
-        <Card>
-            <CardHeader>
-                <CardTitle>Live Match: {liveMatch.teams[0].name} vs {liveMatch.teams[1].name}</CardTitle>
-                <CardDescription>{liveMatch.venue}, {liveMatch.overs} Overs</CardDescription>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 bg-muted rounded-lg">
-                    <h4 className="font-semibold text-lg">{liveMatch.teams[0].name}</h4>
-                    <p className="text-3xl font-bold">{liveMatch.teams[0].runs} / {liveMatch.teams[0].wickets}</p>
-                    <p className="text-sm text-muted-foreground">Overs: {liveMatch.teams[0].overs.toFixed(1)}</p>
-                </div>
-                 <div className="p-4 bg-muted rounded-lg">
-                    <h4 className="font-semibold text-lg">{liveMatch.teams[1].name}</h4>
-                    <p className="text-3xl font-bold">{liveMatch.teams[1].runs} / {liveMatch.teams[1].wickets}</p>
-                    <p className="text-sm text-muted-foreground">Overs: {liveMatch.teams[1].overs.toFixed(1)}</p>
-                </div>
-            </CardContent>
-        </Card>
-
-        {!liveMatch.scorecard?.inning1.team ? (
+  const renderContent = () => {
+    if (isMatchStarting) {
+       return (
             <Card>
                 <CardHeader><CardTitle>Toss</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
@@ -262,52 +250,118 @@ export function LiveScoringDashboard() {
                     )}
                 </CardContent>
             </Card>
-        ) : (isFirstInningStarting || isSecondInningStarting) ? (
-            <PlayerSetup onConfirm={handleSetInitialPlayers} />
-        ) : isWicketFallen ? (
-            <NewBatsmanSelector onConfirm={handleSetNewBatsman} />
-        ) : isOverFinished ? (
-            <NewBowlerSelector onConfirm={handleSetNewBowler} />
-        ) : arePlayersSet ? (
+       );
+    }
+
+    if (isInningStarting) {
+        return <PlayerSetup onConfirm={handleSetInitialPlayers} />;
+    }
+
+    if (isWicketFallen) {
+        return <NewBatsmanSelector onConfirm={handleSetNewBatsman} />;
+    }
+
+    if (isOverFinished) {
+        return <NewBowlerSelector onConfirm={handleSetNewBowler} />;
+    }
+
+    if (arePlayersSet) {
+        return (
             <Card>
                 <CardHeader>
                     <CardTitle>Ball-by-Ball Scoring</CardTitle>
                     <CardDescription>
-                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-                           <span className="flex items-center"><User className="mr-1 h-4 w-4 text-primary"/>Striker: {liveMatch.currentBatsmen.striker?.name}</span>
-                           <span className="flex items-center"><User className="mr-1 h-4 w-4 text-muted-foreground"/>Non-Striker: {liveMatch.currentBatsmen.nonStriker?.name}</span>
-                           <span className="flex items-center"><Shield className="mr-1 h-4 w-4 text-primary"/>Bowler: {liveMatch.currentBowler?.name}</span>
+                       <div className="flex flex-col sm:flex-row sm:flex-wrap gap-x-4 gap-y-2 text-sm mt-2">
+                           <span className="flex items-center"><User className="mr-1 h-4 w-4 text-primary"/>Striker: <strong>{liveMatch.currentBatsmen.striker?.name}</strong></span>
+                           <span className="flex items-center"><User className="mr-1 h-4 w-4 text-muted-foreground"/>Non-Striker: <strong>{liveMatch.currentBatsmen.nonStriker?.name}</strong></span>
+                           <span className="flex items-center"><Shield className="mr-1 h-4 w-4 text-primary"/>Bowler: <strong>{liveMatch.currentBowler?.name}</strong></span>
                        </div>
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="flex flex-wrap gap-2">
-                        <Button variant="outline" onClick={() => scoreRun(0)}>0</Button>
-                        <Button variant="outline" onClick={() => scoreRun(1)}>1</Button>
-                        <Button variant="outline" onClick={() => scoreRun(2)}>2</Button>
-                        <Button variant="outline" onClick={() => scoreRun(3)}>3</Button>
-                        <Button variant="default" onClick={() => scoreRun(4)}>4</Button>
-                        <Button variant="default" onClick={() => scoreRun(6)}>6</Button>
+                    <div>
+                        <Label>This Over</Label>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                            {liveMatch.overEvents.length > 0 ? liveMatch.overEvents.map((event, i) => (
+                                <Badge key={i} variant={event === 'W' ? 'destructive' : 'secondary'} className="text-lg">{event}</Badge>
+                            )) : <p className="text-sm text-muted-foreground">First ball of the over.</p>}
+                        </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                        <Button variant="destructive" onClick={scoreWicket}>Wicket</Button>
-                        <Button variant="secondary" onClick={() => scoreExtra('Wide')}>Wide</Button>
-                        <Button variant="secondary" onClick={() => scoreExtra('No Ball')}>No Ball</Button>
-                        <Button variant="outline" onClick={() => scoreRun(1, true)}>Declare 1 Run</Button>
+                    <div className="space-y-2">
+                        <Label>Score Runs</Label>
+                        <div className="flex flex-wrap gap-2">
+                            <Button variant="outline" onClick={() => scoreRun(0)}>0</Button>
+                            <Button variant="outline" onClick={() => scoreRun(1)}>1</Button>
+                            <Button variant="outline" onClick={() => scoreRun(2)}>2</Button>
+                            <Button variant="outline" onClick={() => scoreRun(3)}>3</Button>
+                            <Button variant="default" onClick={() => scoreRun(4)}>4</Button>
+                            <Button variant="default" onClick={() => scoreRun(6)}>6</Button>
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Events</Label>
+                        <div className="flex flex-wrap gap-2">
+                            <Button variant="destructive" onClick={scoreWicket}>Wicket</Button>
+                            <Button variant="secondary" onClick={() => scoreExtra('Wide')}>Wide</Button>
+                            <Button variant="secondary" onClick={() => scoreExtra('No Ball')}>No Ball</Button>
+                            <Button variant="outline" onClick={() => scoreRun(1, true)}>Declare 1 Run</Button>
+                        </div>
                     </div>
                 </CardContent>
             </Card>
-        ) : (
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><Info className="h-5 w-5 text-primary" />Action Required</CardTitle>
-                </CardHeader>
+        )
+    }
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Info className="h-5 w-5 text-primary" />Action Required</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <p className="text-muted-foreground">The system is waiting for the next action.</p>
+            </CardContent>
+        </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+        <Card>
+            <CardHeader>
+                <div className="flex justify-between items-start">
+                    <div>
+                        <CardTitle>Live Match: {liveMatch.teams[0].name} vs {liveMatch.teams[1].name}</CardTitle>
+                        <CardDescription>{liveMatch.venue}, {liveMatch.overs} Overs</CardDescription>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={leaveLiveMatch}><ArrowLeft className="mr-2"/> Back to All Matches</Button>
+                </div>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 bg-muted rounded-lg">
+                    <h4 className="font-semibold text-lg">{liveMatch.scorecard?.inning1.team || 'Team 1'}</h4>
+                    <p className="text-3xl font-bold">{liveMatch.teams.find(t => t.name === liveMatch.scorecard?.inning1.team)?.runs ?? '0'} / {liveMatch.teams.find(t => t.name === liveMatch.scorecard?.inning1.team)?.wickets ?? '0'}</p>
+                    <p className="text-sm text-muted-foreground">Overs: {liveMatch.teams.find(t => t.name === liveMatch.scorecard?.inning1.team)?.overs.toFixed(1) ?? '0.0'}</p>
+                </div>
+                 <div className="p-4 bg-muted rounded-lg">
+                    <h4 className="font-semibold text-lg">{liveMatch.scorecard?.inning2.team || 'Team 2'}</h4>
+                    <p className="text-3xl font-bold">{liveMatch.teams.find(t => t.name === liveMatch.scorecard?.inning2.team)?.runs ?? '0'} / {liveMatch.teams.find(t => t.name === liveMatch.scorecard?.inning2.team)?.wickets ?? '0'}</p>
+                    <p className="text-sm text-muted-foreground">Overs: {liveMatch.teams.find(t => t.name === liveMatch.scorecard?.inning2.team)?.overs.toFixed(1) ?? '0.0'}</p>
+                </div>
+            </CardContent>
+             {liveMatch.result && (
                 <CardContent>
-                    <p className="text-muted-foreground">Please set the players for the current phase of the match.</p>
+                    <Alert className="border-primary">
+                        <AlertTitle className="font-bold">Match Finished!</AlertTitle>
+                        <AlertDescription>{liveMatch.result}</AlertDescription>
+                    </Alert>
                 </CardContent>
-            </Card>
-        )}
-        <Button variant="link" onClick={endMatch}>End & Finalize Match</Button>
+            )}
+        </Card>
+
+        {renderContent()}
+
+        {liveMatch.status !== 'completed' && <Button variant="link" onClick={endMatch}>End & Finalize Match</Button>}
     </div>
   );
 }
+
