@@ -31,7 +31,7 @@ type AppContextType = AppData & {
   performToss: () => void;
   selectTossOption: (option: 'Bat' | 'Bowl') => void;
   scoreRun: (runs: number) => void;
-  scoreWicket: () => void;
+  scoreWicket: (wicket: any) => void;
   scoreExtra: (type: 'Wide' | 'No Ball') => void;
   endMatch: () => void;
   calculateRankings: () => { bestBatsmen: Player[]; bestBowlers: Player[]; bestAllrounders: Player[]; };
@@ -123,18 +123,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const match = matches.find(m => m.id === matchId);
     if (!match || !players.length) return;
   
-    // Function to get full player object from an ID
-    const getPlayerById = (id: string | Player) => {
-        if (typeof id === 'object' && id !== null) return id; // Already a player object
-        return players.find(p => p.id === id);
+    const getPlayerById = (playerId: string) => {
+        return players.find(p => p.id === playerId);
     }
   
-    // Find the full player objects for each team
-    const team1Players = match.teams[0].players.map(p_id => getPlayerById(p_id as string)).filter(p => p) as Player[];
-    const team2Players = match.teams[1].players.map(p_id => getPlayerById(p_id as string)).filter(p => p) as Player[];
+    const team1PlayerIds = match.teams[0].players as unknown as string[];
+    const team2PlayerIds = match.teams[1].players as unknown as string[];
+  
+    const team1Players = team1PlayerIds.map(getPlayerById).filter(p => p) as Player[];
+    const team2Players = team2PlayerIds.map(getPlayerById).filter(p => p) as Player[];
   
     const liveMatchData: LiveMatch = {
-      ...JSON.parse(JSON.stringify(match)), // Deep copy to avoid mutation issues
+      ...JSON.parse(JSON.stringify(match)),
       teams: [
         { ...match.teams[0], players: team1Players },
         { ...match.teams[1], players: team2Players }
@@ -364,5 +364,4 @@ export const useAppContext = (): AppContextType => {
   return context;
 };
 
-    
     
