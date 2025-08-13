@@ -49,12 +49,12 @@ export function PlayerList() {
                     <TableCell><Badge variant={getRoleBadgeVariant(p.role)}>{p.role}</Badge></TableCell>
                     <TableCell>{p.team || '-'}</TableCell>
                     <TableCell>{p.society || '-'}</TableCell>
-                    <TableCell className="text-right">{p.stats.matches}</TableCell>
-                    <TableCell className="text-right">{p.stats.runs}</TableCell>
-                    <TableCell className="text-right">{p.stats.wickets}</TableCell>
-                    <TableCell className="text-right">{p.stats.battingAverage.toFixed(2)}</TableCell>
-                    <TableCell className="text-right">{p.stats.strikeRate.toFixed(2)}</TableCell>
-                    <TableCell className="text-right">{p.stats.bowlingEconomy.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">{p.stats?.matches ?? 0}</TableCell>
+                    <TableCell className="text-right">{p.stats?.runs ?? 0}</TableCell>
+                    <TableCell className="text-right">{p.stats?.wickets ?? 0}</TableCell>
+                    <TableCell className="text-right">{p.stats?.battingAverage?.toFixed(2) ?? '0.00'}</TableCell>
+                    <TableCell className="text-right">{p.stats?.strikeRate?.toFixed(2) ?? '0.00'}</TableCell>
+                    <TableCell className="text-right">{p.stats?.bowlingEconomy?.toFixed(2) ?? '0.00'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
