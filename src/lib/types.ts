@@ -47,7 +47,7 @@ export interface ScorecardInning {
     };
   };
   bowlers: {
-    [playerId: string]: {
+    [playerId:string]: {
       playerId: string;
       runs: number;
       overs: number;
@@ -78,6 +78,7 @@ export interface Match {
 }
 
 export interface LiveMatch extends Match {
+  id: string;
   tossWinner?: number;
   currentInning: 1 | 2;
   currentBatsmen: {
