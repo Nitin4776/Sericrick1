@@ -139,7 +139,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         });
         return;
     }
-    await deleteDoc(doc(db, "matches", matchId));
+    await deleteDoc(doc(db, "matches", String(matchId)));
   };
 
   const scheduleTournament = async (tournamentData: Omit<Tournament, 'id' | 'teams' | 'status' | 'scheduledMatches'>) => {
@@ -269,7 +269,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const startScoringMatch = async (matchId: string) => {
-    const matchDoc = await getDoc(doc(db, "matches", matchId));
+    const matchDoc = await getDoc(doc(db, "matches", String(matchId)));
     if (!matchDoc.exists()) return;
     
     const match = { id: matchDoc.id, ...matchDoc.data() } as Match;
@@ -503,7 +503,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const endMatch = async (reason?: string) => {
     if(!liveMatch) return;
 
-    const matchRef = doc(db, "matches", liveMatch.id as string);
+    const matchRef = doc(db, "matches", String(liveMatch.id));
     const matchDoc = await getDoc(matchRef);
 
     if (!matchDoc.exists()) {
@@ -677,3 +677,5 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
+
+    
