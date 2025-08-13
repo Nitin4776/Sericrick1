@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useForm } from "react-hook-form";
@@ -41,6 +42,9 @@ export function MatchForm() {
     },
   });
 
+  const team1SelectedPlayers = form.watch("team1Players");
+  const team2SelectedPlayers = form.watch("team2Players");
+
   const onSubmit = (data: MatchFormValues) => {
     const team1PlayersList = players.filter(p => data.team1Players.includes(p.id as string));
     const team2PlayersList = players.filter(p => data.team2Players.includes(p.id as string));
@@ -49,8 +53,8 @@ export function MatchForm() {
       overs: data.overs,
       venue: data.venue,
       teams: [
-        { name: data.team1Name, players: team1PlayersList, runs: 0, wickets: 0, overs: 0, inningCompleted: false },
-        { name: data.team2Name, players: team2PlayersList, runs: 0, wickets: 0, overs: 0, inningCompleted: false },
+        { name: data.team1Name, players: team1PlayersList as any, runs: 0, wickets: 0, overs: 0, inningCompleted: false },
+        { name: data.team2Name, players: team2PlayersList as any, runs: 0, wickets: 0, overs: 0, inningCompleted: false },
       ],
     });
     
@@ -118,6 +122,7 @@ export function MatchForm() {
                                     <FormControl>
                                         <Checkbox
                                             checked={field.value?.includes(player.id as string)}
+                                            disabled={team2SelectedPlayers?.includes(player.id as string)}
                                             onCheckedChange={(checked) => {
                                                 return checked
                                                 ? field.onChange([...field.value, player.id as string])
@@ -152,6 +157,7 @@ export function MatchForm() {
                                     <FormControl>
                                         <Checkbox
                                             checked={field.value?.includes(player.id as string)}
+                                            disabled={team1SelectedPlayers?.includes(player.id as string)}
                                             onCheckedChange={(checked) => {
                                                 return checked
                                                 ? field.onChange([...field.value, player.id as string])
