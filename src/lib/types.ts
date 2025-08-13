@@ -113,7 +113,7 @@ export interface Tournament {
     end: string;
   };
   teams: TeamInTournament[];
-  scheduledMatches?: string[]; // IDs of matches scheduled for this tournament
+  scheduledMatches: string[]; // IDs of matches scheduled for this tournament
   status: 'scheduled' | 'ongoing' | 'completed';
 }
 

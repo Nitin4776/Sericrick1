@@ -56,7 +56,7 @@ export function TournamentForm() {
       endDate: "",
       description: "",
       format: "Knockout",
-      numberOfMatches: undefined,
+      numberOfMatches: 1,
     },
   });
 

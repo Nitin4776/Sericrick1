@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAppContext } from "@/context/app-context";
-import type { Player } from "@/lib/types";
+import type { Player, Match } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,10 +15,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Calendar, MapPin, Trophy, PlusCircle, ArrowLeft, BarChart2 } from "lucide-react";
+import { Users, Calendar, MapPin, Trophy, PlusCircle, ArrowLeft, BarChart2, Play, StopCircle, Swords } from "lucide-react";
 import React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
 
 
 const teamSchema = z.object({
@@ -77,10 +79,59 @@ function PointsTable({ tournament }: { tournament: any }) {
     );
 }
 
+function ScheduledMatches({ tournament, allMatches }: { tournament: any, allMatches: Match[] }) {
+    const tournamentMatches = allMatches.filter(m => m.tournamentId === tournament.id);
+
+    if (tournament.status === 'scheduled') {
+        return (
+             <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><Swords />Scheduled Matches</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-muted-foreground">Matches will appear here once the tournament starts.</p>
+                </CardContent>
+            </Card>
+        )
+    }
+
+    if (tournamentMatches.length === 0) {
+        return (
+            <Card>
+               <CardHeader>
+                   <CardTitle className="flex items-center gap-2"><Swords />Scheduled Matches</CardTitle>
+               </CardHeader>
+               <CardContent>
+                   <p className="text-muted-foreground">No matches have been scheduled for this tournament yet.</p>
+               </CardContent>
+           </Card>
+       )
+    }
+    
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Swords />Scheduled Matches</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+                {tournamentMatches.map(match => (
+                    <div key={match.id} className="p-3 bg-muted/50 rounded-md flex justify-between items-center">
+                        <div>
+                            <p className="font-semibold">{match.teams[0].name} vs {match.teams[1].name}</p>
+                            <p className="text-sm text-muted-foreground">{match.venue}</p>
+                        </div>
+                        <Badge variant={match.status === 'completed' ? 'secondary' : 'default'}>{match.status}</Badge>
+                    </div>
+                ))}
+            </CardContent>
+        </Card>
+    )
+}
+
 export default function TournamentDetailPage() {
   const { id } = useParams();
   const router = useRouter();
-  const { tournaments, players, registerTeamForTournament } = useAppContext();
+  const { tournaments, players, matches, registerTeamForTournament, isAdmin, startTournament, closeTournament } = useAppContext();
   const { toast } = useToast();
 
   const tournament = tournaments.find(t => t.id === id);
@@ -101,6 +152,16 @@ export default function TournamentDetailPage() {
         form.reset();
     }
   };
+  
+  const handleStartTournament = async () => {
+    if(!tournament) return;
+    await startTournament(tournament.id as string);
+  }
+
+  const handleCloseTournament = async () => {
+    if(!tournament) return;
+    await closeTournament(tournament.id as string);
+  }
 
   const registeredPlayerIds = React.useMemo(() => {
     if (!tournament) return new Set();
@@ -123,24 +184,49 @@ export default function TournamentDetailPage() {
 
   const getPlayerName = (id: string) => players.find(p => p.id === id)?.name || 'Unknown Player';
 
+  const allMatchesCompleted = tournament.scheduledMatches && tournament.scheduledMatches.length > 0 && tournament.scheduledMatches.every(matchId => {
+      const match = matches.find(m => m.id === matchId);
+      return match && match.status === 'completed';
+  });
+
   return (
     <div className="space-y-8">
         <div>
             <Button variant="ghost" onClick={() => router.back()} className="mb-4">
                 <ArrowLeft className="mr-2 h-4 w-4" /> Back to Tournaments
             </Button>
-            <h1 className="text-4xl font-bold tracking-tight">{tournament.name}</h1>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2 text-muted-foreground">
-                <span className="flex items-center gap-2"><Trophy /> {tournament.format}</span>
-                <span className="flex items-center gap-2"><MapPin /> {tournament.venue}</span>
-                <span className="flex items-center gap-2"><Calendar /> {new Date(tournament.dates.start).toLocaleDateString()} - {new Date(tournament.dates.end).toLocaleDateString()}</span>
+            <div className="flex justify-between items-start">
+                <div>
+                    <h1 className="text-4xl font-bold tracking-tight">{tournament.name}</h1>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2 text-muted-foreground">
+                        <span className="flex items-center gap-2"><Trophy /> {tournament.format}</span>
+                        <span className="flex items-center gap-2"><MapPin /> {tournament.venue}</span>
+                        <span className="flex items-center gap-2"><Calendar /> {new Date(tournament.dates.start).toLocaleDateString()} - {new Date(tournament.dates.end).toLocaleDateString()}</span>
+                        <Badge variant={tournament.status === 'completed' ? 'secondary' : 'default'} className="capitalize">{tournament.status}</Badge>
+                    </div>
+                    {tournament.description && <p className="mt-4 text-muted-foreground max-w-2xl">{tournament.description}</p>}
+                </div>
+                {isAdmin && (
+                    <div className="flex gap-2">
+                        {tournament.status === 'scheduled' && (
+                            <Button onClick={handleStartTournament}>
+                                <Play className="mr-2 h-4 w-4"/> Start Tournament
+                            </Button>
+                        )}
+                        {tournament.status === 'ongoing' && allMatchesCompleted && (
+                             <Button onClick={handleCloseTournament}>
+                                <StopCircle className="mr-2 h-4 w-4"/> Close Tournament
+                            </Button>
+                        )}
+                    </div>
+                )}
             </div>
-            {tournament.description && <p className="mt-4 text-muted-foreground max-w-2xl">{tournament.description}</p>}
         </div>
 
         <Tabs defaultValue="teams">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="teams"><Users className="mr-2" />Teams & Registration</TabsTrigger>
+                <TabsTrigger value="matches"><Swords className="mr-2" />Matches</TabsTrigger>
                 <TabsTrigger value="points"><BarChart2 className="mr-2"/>Points Table</TabsTrigger>
             </TabsList>
             <TabsContent value="teams">
@@ -228,14 +314,19 @@ export default function TournamentDetailPage() {
                                     </FormItem>
                                 )}
                                 />
-                                <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-                                    {form.formState.isSubmitting ? 'Registering...' : 'Register Team'}
+                                <Button type="submit" className="w-full" disabled={form.formState.isSubmitting || tournament.status !== 'scheduled'}>
+                                    {tournament.status !== 'scheduled' ? 'Registration Closed' : form.formState.isSubmitting ? 'Registering...' : 'Register Team'}
                                 </Button>
                             </form>
                             </Form>
                         </CardContent>
                         </Card>
                     </div>
+                </div>
+            </TabsContent>
+            <TabsContent value="matches">
+                <div className="mt-6">
+                    <ScheduledMatches tournament={tournament} allMatches={matches} />
                 </div>
             </TabsContent>
             <TabsContent value="points">

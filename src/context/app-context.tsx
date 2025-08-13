@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, where, getDocs, writeBatch, getDoc, arrayUnion } from 'firebase/firestore';
-import type { AppData, Player, Match, Tournament, LiveMatch, AuctionPlayer, Auction, PlayerStats, TeamInTournament } from '@/lib/types';
+import type { AppData, Player, Match, Tournament, LiveMatch, AuctionPlayer, Auction, PlayerStats, TeamInTournament, TeamInMatch } from '@/lib/types';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { toast } from '@/hooks/use-toast';
 
@@ -30,6 +30,8 @@ type AppContextType = AppData & {
   scheduleTournament: (tournamentData: Omit<Tournament, 'id' | 'teams' | 'status'>) => Promise<void>;
   deleteTournament: (tournamentId: string) => Promise<void>;
   registerTeamForTournament: (tournamentId: string, teamData: Omit<TeamInTournament, 'id'>) => Promise<boolean>;
+  startTournament: (tournamentId: string) => Promise<void>;
+  closeTournament: (tournamentId: string) => Promise<void>;
   startScoringMatch: (matchId: string) => void;
   leaveLiveMatch: () => void;
   performToss: () => void;
@@ -59,8 +61,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const unsubPlayers = onSnapshot(collection(db, "players"), (snapshot) => {
       setPlayers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Player)));
     });
-    const unsubMatches = onSnapshot(collection(db, "matches"), (snapshot) => {
-      setMatches(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Match)));
+    const unsubMatches = onSnapshot(query(collection(db, "matches")), (snapshot) => {
+        setMatches(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Match)).sort((a,b) => (a.id as number) - (b.id as number) ));
     });
     const unsubTournaments = onSnapshot(collection(db, "tournaments"), (snapshot) => {
       setTournaments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Tournament)));
@@ -131,11 +133,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     await deleteDoc(doc(db, "matches", matchId));
   };
 
-  const scheduleTournament = async (tournamentData: Omit<Tournament, 'id' | 'teams' | 'status'>) => {
+  const scheduleTournament = async (tournamentData: Omit<Tournament, 'id' | 'teams' | 'status' | 'scheduledMatches'>) => {
     const newTournament: Omit<Tournament, 'id'> = {
       ...tournamentData,
       teams: [],
       status: 'scheduled',
+      scheduledMatches: []
     };
     await addDoc(collection(db, "tournaments"), newTournament);
   };
@@ -169,6 +172,91 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const deleteTournament = async (tournamentId: string) => {
     await deleteDoc(doc(db, "tournaments", tournamentId));
+  };
+
+  const startTournament = async (tournamentId: string) => {
+    const tournamentRef = doc(db, "tournaments", tournamentId);
+    const tournamentDoc = await getDoc(tournamentRef);
+    if (!tournamentDoc.exists()) {
+        toast({ title: "Error", description: "Tournament not found.", variant: "destructive"});
+        return;
+    }
+
+    const tournament = { id: tournamentDoc.id, ...tournamentDoc.data() } as Tournament;
+    if (tournament.status !== 'scheduled') {
+        toast({ title: "Error", description: "Tournament has already started.", variant: "destructive"});
+        return;
+    }
+
+    const scheduledMatchIds: string[] = [];
+    const batch = writeBatch(db);
+
+    const teamsInTournament = tournament.teams.map(t => {
+        const teamPlayers = players.filter(p => t.playerIds.includes(p.id as string));
+        return {
+            name: t.name,
+            players: teamPlayers,
+            runs: 0, wickets: 0, overs: 0, inningCompleted: false
+        }
+    });
+
+    if (tournament.format === 'Series (2 Teams)') {
+        if (teamsInTournament.length !== 2) {
+            toast({ title: "Error", description: "A Series format requires exactly 2 registered teams.", variant: "destructive"});
+            return;
+        }
+        for (let i = 0; i < (tournament.numberOfMatches || 1); i++) {
+            const matchRef = doc(collection(db, "matches"));
+            batch.set(matchRef, {
+                overs: 8, // Default overs, can be configurable later
+                venue: tournament.venue,
+                teams: [teamsInTournament[0], teamsInTournament[1]],
+                status: 'scheduled',
+                result: null,
+                playerOfTheMatch: null,
+                scorecard: null,
+                tournamentId: tournament.id,
+                id: new Date().getTime() + i,
+            });
+            scheduledMatchIds.push(matchRef.id);
+        }
+    } else if (tournament.format === 'Round Robin') {
+        if (teamsInTournament.length < 2) {
+             toast({ title: "Error", description: "Round Robin format requires at least 2 teams.", variant: "destructive"});
+             return;
+        }
+        for (let i = 0; i < teamsInTournament.length; i++) {
+            for (let j = i + 1; j < teamsInTournament.length; j++) {
+                const matchRef = doc(collection(db, "matches"));
+                 batch.set(matchRef, {
+                    overs: 8,
+                    venue: tournament.venue,
+                    teams: [teamsInTournament[i], teamsInTournament[j]],
+                    status: 'scheduled',
+                    result: null,
+                    playerOfTheMatch: null,
+                    scorecard: null,
+                    tournamentId: tournament.id,
+                    id: new Date().getTime() + i + j,
+                });
+                scheduledMatchIds.push(matchRef.id);
+            }
+        }
+    } else {
+        toast({ title: "Coming Soon", description: `Automatic scheduling for "${tournament.format}" is not yet implemented.`});
+        return; // Do not proceed if format is not handled
+    }
+    
+    batch.update(tournamentRef, { status: 'ongoing', scheduledMatches: scheduledMatchIds });
+    
+    await batch.commit();
+    toast({ title: "Tournament Started!", description: `Matches have been scheduled for ${tournament.name}`});
+  }
+
+  const closeTournament = async (tournamentId: string) => {
+    const tournamentRef = doc(db, "tournaments", tournamentId);
+    await updateDoc(tournamentRef, { status: 'completed' });
+    toast({ title: "Tournament Closed", description: "The tournament has been marked as completed."});
   };
 
   const startScoringMatch = (matchId: string) => {
@@ -518,7 +606,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const appData = { isAdmin, players, matches, tournaments, liveMatch, auction };
 
   return (
-    <AppContext.Provider value={{ ...appData, login, logout, addPlayer, scheduleMatch, deleteMatch, scheduleTournament, deleteTournament, registerTeamForTournament, startScoringMatch, leaveLiveMatch, performToss, selectTossOption, scoreRun, scoreWicket, scoreExtra, endMatch, calculateRankings, updateLiveMatchInState, startAuction, placeBid, setLivePlayers }}>
+    <AppContext.Provider value={{ ...appData, login, logout, addPlayer, scheduleMatch, deleteMatch, scheduleTournament, deleteTournament, registerTeamForTournament, startTournament, closeTournament, startScoringMatch, leaveLiveMatch, performToss, selectTossOption, scoreRun, scoreWicket, scoreExtra, endMatch, calculateRankings, updateLiveMatchInState, startAuction, placeBid, setLivePlayers }}>
       {children}
     </AppContext.Provider>
   );
@@ -531,5 +619,3 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
-
-    
