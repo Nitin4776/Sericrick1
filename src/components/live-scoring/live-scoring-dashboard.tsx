@@ -296,7 +296,7 @@ function DismissalDialog({ open, onOpenChange, onConfirm, liveMatch, type }: { o
                       <Input 
                         type="number" 
                         value={runs} 
-                        onChange={e => setRuns(parseInt(e.target.value) || 0)} 
+                        onChange={e => setRuns(parseInt(e.target.value, 10) || 0)}
                         min={0} 
                         max={6} 
                       />
@@ -306,6 +306,36 @@ function DismissalDialog({ open, onOpenChange, onConfirm, liveMatch, type }: { o
                 <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                     <AlertDialogAction onClick={() => onConfirm(selectedBatsman, runs)}>Confirm {type}</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    );
+}
+
+function NoBallDialog({ open, onOpenChange, onConfirm }: { open: boolean, onOpenChange: (open: boolean) => void, onConfirm: (runs: number) => void }) {
+    const [runs, setRuns] = useState(0);
+
+    return (
+        <AlertDialog open={open} onOpenChange={onOpenChange}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>No Ball</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        A no-ball adds 1 run automatically. Enter any additional runs scored by the batsman.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div>
+                    <Label>Runs off Bat</Label>
+                    <Input 
+                        type="number" 
+                        value={runs} 
+                        onChange={e => setRuns(parseInt(e.target.value) || 0)} 
+                        min={0}
+                    />
+                </div>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => onConfirm(runs)}>Confirm</AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
@@ -381,6 +411,7 @@ export function LiveScoringDashboard() {
   const [isEndMatchDialogOpen, setIsEndMatchDialogOpen] = useState(false);
   const [isMatchCompletedDialogOpen, setMatchCompletedDialogOpen] = useState(false);
   const [dismissalType, setDismissalType] = useState<'Run Out' | 'Retire' | null>(null);
+  const [isNoBallDialogOpen, setIsNoBallDialogOpen] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
@@ -428,6 +459,11 @@ export function LiveScoringDashboard() {
       handleRetire(batsman);
     }
     setDismissalType(null);
+  };
+  
+  const handleNoBallConfirm = (runs: number) => {
+    scoreExtra('No Ball', runs);
+    setIsNoBallDialogOpen(false);
   };
 
   const scheduledMatches = matches.filter(m => m.status === 'scheduled');
@@ -560,7 +596,7 @@ export function LiveScoringDashboard() {
                             <Label>This Over</Label>
                             <div className="flex flex-wrap gap-2 mt-2">
                                 {overEvents.length > 0 ? overEvents.map((event, i) => (
-                                    <Badge key={i} variant={event === 'W' ? 'destructive' : 'secondary'} className="text-lg">{event}</Badge>
+                                    <Badge key={i} variant={event.includes('W') ? 'destructive' : 'secondary'} className="text-lg">{event}</Badge>
                                 )) : <p className="text-sm text-muted-foreground">First ball of the over.</p>}
                             </div>
                         </div>
@@ -569,6 +605,7 @@ export function LiveScoringDashboard() {
                             <div className="flex flex-wrap gap-2">
                                 <Button variant="outline" onClick={() => scoreRun(0)}>0</Button>
                                 <Button variant="outline" onClick={() => scoreRun(1)}>1</Button>
+                                <Button variant="outline" onClick={() => scoreRun(1, true)}>1 Declare</Button>
                                 <Button variant="outline" onClick={() => scoreRun(2)}>2</Button>
                                 <Button variant="outline" onClick={() => scoreRun(3)}>3</Button>
                                 <Button variant="default" onClick={() => scoreRun(4)}>4</Button>
@@ -582,7 +619,7 @@ export function LiveScoringDashboard() {
                                 <Button variant="destructive" onClick={() => setDismissalType('Run Out')}>Run Out</Button>
                                 <Button variant="destructive" onClick={() => setDismissalType('Retire')} className="bg-blue-600 hover:bg-blue-700">Retire</Button>
                                 <Button variant="secondary" onClick={() => scoreExtra('Wide')}>Wide</Button>
-                                <Button variant="secondary" onClick={() => scoreExtra('No Ball')}>No Ball</Button>
+                                <Button variant="secondary" onClick={() => setIsNoBallDialogOpen(true)}>No Ball</Button>
                             </div>
                         </div>
                     </CardContent>
@@ -694,6 +731,13 @@ export function LiveScoringDashboard() {
                 type={dismissalType}
             />
         )}
+        <NoBallDialog
+            open={isNoBallDialogOpen}
+            onOpenChange={setIsNoBallDialogOpen}
+            onConfirm={handleNoBallConfirm}
+        />
     </div>
   );
 }
+
+    

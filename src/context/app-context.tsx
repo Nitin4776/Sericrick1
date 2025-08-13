@@ -38,7 +38,7 @@ type AppContextType = AppData & {
   selectTossOption: (option: 'Bat' | 'Bowl') => void;
   scoreRun: (runs: number, isDeclared?: boolean) => void;
   scoreWicket: () => void;
-  scoreExtra: (type: 'Wide' | 'No Ball') => void;
+  scoreExtra: (type: 'Wide' | 'No Ball', runsOffBat?: number) => void;
   handleRunOut: (batsmanOut: 'striker' | 'non-striker', runsCompleted: number) => void;
   handleRetire: (batsmanRetired: 'striker' | 'non-striker') => void;
   endMatch: (reason?: string) => void;
@@ -391,7 +391,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     updateLiveMatchInState(match);
   };
 
-  const _updateScore = (runs: number, isWicket: boolean, isExtra: boolean, isLegalBall: boolean, isDeclared: boolean = false, isRunOut: boolean = false) => {
+  const _updateScore = (runs: number, isWicket: boolean, isExtra: boolean, isLegalBall: boolean, isDeclared: boolean = false, isRunOut: boolean = false, runsOffBatForNoBall: number = 0) => {
     if(!liveMatch || !liveMatch.currentBatsmen.striker || !liveMatch.currentBowler) return;
 
     let match = { ...liveMatch };
@@ -402,29 +402,38 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const currentInningData = match.scorecard![`inning${match.currentInning}` as 'inning1' | 'inning2'];
     const currentBattingTeam = match.teams.find(t => t.name === currentInningData.team)!;
 
-    let event = isWicket ? 'W' : `${runs}`;
-    if (isRunOut) {
+    let event = '';
+    if (isWicket) {
         event = 'W';
+    } else if (isExtra && runsOffBatForNoBall > 0) {
+        event = `${runsOffBatForNoBall}nb`;
+    } else if (isExtra) {
+        event = isLegalBall ? '1nb' : 'wd';
+    } else {
+        event = `${runs}`;
     }
-    if (isExtra) event += 'wd'; // simplified for now
     match.overEvents.push(event);
     
-    currentBattingTeam.runs += runs;
-    if(isExtra) currentInningData.extraRuns += (runs);
+    const totalRuns = runs + runsOffBatForNoBall;
+    currentBattingTeam.runs += totalRuns;
+
+    if(isExtra) currentInningData.extraRuns += runs;
 
     const bowlerStats = currentInningData.bowlers[match.currentBowler.id] ||= {playerId: match.currentBowler.id as string, runs: 0, overs: 0, wickets: 0};
-    bowlerStats.runs += runs;
+    bowlerStats.runs += totalRuns;
 
     const batsmanStats = currentInningData.batsmen[match.currentBatsmen.striker.id] ||= {playerId: match.currentBatsmen.striker.id as string, runs: 0, balls: 0, fours: 0, sixes: 0, status: 'not_out'};
-    if(!isExtra) {
-        batsmanStats.runs += runs;
-        if(runs === 4) batsmanStats.fours +=1;
-        if(runs === 6) batsmanStats.sixes +=1;
-    }
+    
+    const runsForBatsman = isExtra ? runsOffBatForNoBall : runs;
+    batsmanStats.runs += runsForBatsman;
+    if(runsForBatsman === 4) batsmanStats.fours += 1;
+    if(runsForBatsman === 6) batsmanStats.sixes += 1;
 
     if(isLegalBall) {
         match.ballsInOver += 1;
-        batsmanStats.balls +=1;
+        if (!isExtra) {
+          batsmanStats.balls +=1;
+        }
     }
     
     const wasLastBallOfOver = match.ballsInOver === 6;
@@ -442,7 +451,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         } else {
             match.currentBatsmen.striker = null; // Prompt for new batsman
         }
-    } else if (runs % 2 !== 0 && !isExtra && !isDeclared) {
+    } else if (runsForBatsman % 2 !== 0 && !isDeclared) {
         [match.currentBatsmen.striker, match.currentBatsmen.nonStriker] = [match.currentBatsmen.nonStriker, match.currentBatsmen.striker];
     }
     
@@ -490,9 +499,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const scoreRun = (runs: number, isDeclared: boolean = false) => _updateScore(runs, false, false, true, isDeclared);
   const scoreWicket = () => _updateScore(0, true, false, true, false, false);
-  const scoreExtra = (type: 'Wide' | 'No Ball') => {
-    const isLegal = type === 'No Ball';
-    _updateScore(1, false, true, isLegal);
+  const scoreExtra = (type: 'Wide' | 'No Ball', runsOffBat: number = 0) => {
+    if (type === 'Wide') {
+        _updateScore(1, false, true, false);
+    } else { // No Ball
+        _updateScore(1, false, true, true, false, false, runsOffBat);
+    }
   }
 
   const handleDismissal = (batsmanType: 'striker' | 'non-striker', runs: number, dismissalStatus: BatsmanStatus, isRunOut: boolean = false) => {
@@ -861,3 +873,5 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
+
+    
