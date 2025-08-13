@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { Match, ScorecardInning, Player } from "@/lib/types";
@@ -11,6 +12,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAppContext } from "@/context/app-context";
+import { useMemo } from "react";
 
 interface ScorecardDialogProps {
   match: Match | null;
@@ -91,16 +93,48 @@ const InningScorecard = ({ inningData, battingTeamName }: { inningData: Scorecar
 
 export function ScorecardDialog({ match, isOpen, onOpenChange }: ScorecardDialogProps) {
   const { players } = useAppContext();
-  if (!match) return null;
 
   const getPlayerName = (playersList: Player[], id: string) => {
     const player = playersList.find(p => p.id === id);
     return player ? player.name : 'Unknown Player';
   };
+  
+  const allPlayersInMatch = useMemo(() => {
+    if (!match) return [];
+    return match.teams.flatMap(t => t.players);
+  }, [match]);
+  
+  const playerOfTheMatchStats = useMemo(() => {
+    if (!match || !match.playerOfTheMatch || !match.scorecard) return null;
+    
+    const potmId = match.playerOfTheMatch;
+    let runs = 0;
+    let wickets = 0;
 
-  const allPlayersInMatch = match.teams.flatMap(t => t.players);
+    const innings = [match.scorecard.inning1, match.scorecard.inning2];
+    for (const inning of innings) {
+        if (inning.batsmen[potmId]) {
+            runs += inning.batsmen[potmId].runs;
+        }
+        if (inning.bowlers[potmId]) {
+            wickets += inning.bowlers[potmId].wickets;
+        }
+    }
+    
+    if (runs === 0 && wickets === 0) return null;
 
-  const playerOfTheMatchName = match.playerOfTheMatch ? getPlayerName(allPlayersInMatch, match.playerOfTheMatch) : 'N/A';
+    let statsString = [];
+    if (runs > 0) statsString.push(`${runs} runs`);
+    if (wickets > 0) statsString.push(`${wickets} wkts`);
+
+    return `(${statsString.join(' & ')})`;
+
+  }, [match]);
+
+
+  const playerOfTheMatchName = match?.playerOfTheMatch ? getPlayerName(allPlayersInMatch, match.playerOfTheMatch) : 'N/A';
+  
+  if (!match) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -109,7 +143,7 @@ export function ScorecardDialog({ match, isOpen, onOpenChange }: ScorecardDialog
           <DialogTitle>Scorecard: {match.teams[0].name} vs {match.teams[1].name}</DialogTitle>
           <DialogDescription>
             {match.result}
-            {match.playerOfTheMatch && ` | Player of the Match: ${playerOfTheMatchName}`}
+            {match.playerOfTheMatch && ` | Player of the Match: ${playerOfTheMatchName} ${playerOfTheMatchStats || ''}`}
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="h-[60vh] p-4">
