@@ -17,9 +17,13 @@ function RankingList({ players, statKey, statLabel, fixed = 2 }: { players: Play
           <span className="flex items-center">
             <span className="font-semibold w-5">{index + 1}.</span> {p.name}
           </span>
-          <span className="font-mono text-primary">
-            {(p.stats[statKey] as number).toFixed(fixed)} <span className="text-xs text-muted-foreground">{statLabel}</span>
-          </span>
+          <div className="flex items-baseline">
+            <span className="font-mono text-primary">
+              {(p.stats[statKey] as number).toFixed(fixed)}
+            </span>
+            <span className="text-xs text-muted-foreground ml-1">{statLabel}</span>
+            <span className="text-xs text-muted-foreground ml-2">({p.stats?.matches || 0} M)</span>
+          </div>
         </li>
       ))}
     </ol>
@@ -37,9 +41,12 @@ function AllRounderRankingList({ players }: { players: Player[] }) {
                     <span className="flex items-center">
                         <span className="font-semibold w-5">{index + 1}.</span> {p.name}
                     </span>
-                    <span className="font-mono text-primary">
-                        {p.stats.runs} <span className="text-xs text-muted-foreground">R</span> / {p.stats.wickets} <span className="text-xs text-muted-foreground">W</span>
-                    </span>
+                     <div className="flex items-baseline">
+                        <span className="font-mono text-primary">
+                            {p.stats.runs} <span className="text-xs text-muted-foreground">R</span> / {p.stats.wickets} <span className="text-xs text-muted-foreground">W</span>
+                        </span>
+                        <span className="text-xs text-muted-foreground ml-2">({p.stats?.matches || 0} M)</span>
+                    </div>
                 </li>
             ))}
         </ol>
