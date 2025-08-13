@@ -216,7 +216,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 playerOfTheMatch: null,
                 scorecard: null,
                 tournamentId: tournament.id,
-                id: new Date().getTime() + i,
+                id: (new Date().getTime() + i).toString(),
             });
             scheduledMatchIds.push(matchRef.id);
         }
@@ -237,7 +237,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                     playerOfTheMatch: null,
                     scorecard: null,
                     tournamentId: tournament.id,
-                    id: new Date().getTime() + i + j,
+                    id: (new Date().getTime() + i + j).toString(),
                 });
                 scheduledMatchIds.push(matchRef.id);
             }
@@ -351,10 +351,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (!match.overEvents) {
       match.overEvents = [];
     }
-
-    const currentInningData = match.scorecard![`inning${match.currentInning}` as 'inning1' | 'inning2'];
-    const currentBattingTeam = match.teams.find(t => t.name === currentInningData.team)!;
     
+    if (!match.overEvents) {
+      match.overEvents = [];
+    }
+
     let event = isWicket ? 'W' : `${runs}`;
     if (isExtra) event += 'wd'; // simplified for now
     match.overEvents.push(event);
@@ -616,5 +617,7 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
+
+    
 
     
