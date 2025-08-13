@@ -107,6 +107,7 @@ export interface Tournament {
   venue: string;
   description: string;
   format: TournamentFormat;
+  numberOfMatches?: number;
   dates: {
     start: string;
     end: string;

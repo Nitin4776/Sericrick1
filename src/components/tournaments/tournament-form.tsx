@@ -21,6 +21,15 @@ const tournamentSchema = z.object({
   endDate: z.string().min(1, "End date is required"),
   description: z.string().optional(),
   format: z.enum(["Series (2 Teams)", "Round Robin", "Group Stage + Knockout", "Knockout", "League Table"]),
+  numberOfMatches: z.coerce.number().optional(),
+}).refine(data => {
+    if (data.format === "Series (2 Teams)") {
+        return data.numberOfMatches && data.numberOfMatches > 0;
+    }
+    return true;
+}, {
+    message: "Number of matches is required for a series.",
+    path: ["numberOfMatches"],
 });
 
 type TournamentFormValues = z.infer<typeof tournamentSchema>;
@@ -49,6 +58,8 @@ export function TournamentForm() {
     },
   });
 
+  const selectedFormat = form.watch("format");
+
   const onSubmit = (data: TournamentFormValues) => {
     scheduleTournament({
       name: data.name,
@@ -56,6 +67,7 @@ export function TournamentForm() {
       dates: { start: data.startDate, end: data.endDate },
       description: data.description || "",
       format: data.format,
+      numberOfMatches: data.numberOfMatches,
     });
     toast({ title: "Tournament Scheduled", description: `"${data.name}" has been successfully scheduled.` });
     form.reset();
@@ -119,24 +131,39 @@ export function TournamentForm() {
                   )}
                 />
               </div>
-              <FormField
-                control={form.control}
-                name="format"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Format</FormLabel>
-                     <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl><SelectTrigger><SelectValue placeholder="Select format" /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        {formats.map(format => (
-                            <SelectItem key={format} value={format}>{format}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormField
+                    control={form.control}
+                    name="format"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Format</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Select format" /></SelectTrigger></FormControl>
+                        <SelectContent>
+                            {formats.map(format => (
+                                <SelectItem key={format} value={format}>{format}</SelectItem>
+                            ))}
+                        </SelectContent>
+                        </Select>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                {selectedFormat === 'Series (2 Teams)' && (
+                    <FormField
+                    control={form.control}
+                    name="numberOfMatches"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Number of Matches</FormLabel>
+                        <FormControl><Input type="number" placeholder="e.g. 3" {...field} /></FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
                 )}
-              />
+              </div>
               <FormField
                 control={form.control}
                 name="description"
