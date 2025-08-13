@@ -45,6 +45,7 @@ type AppContextType = AppData & {
   calculateRankings: () => { bestBatsmen: Player[]; bestBowlers: Player[]; bestAllrounders: Player[]; };
   updateLiveMatchInState: (liveMatch: LiveMatch | null) => void;
   startAuction: (tournamentId: string) => void;
+  setAuction: (auction: Auction | null) => void;
   placeBid: (playerId: string, bidAmount: number, teamName: string) => boolean;
   setLivePlayers: (strikerId: string, nonStrikerId: string, bowlerId: string) => void;
   calculatePointsTable: (tournament: Tournament) => PointsTableEntry[];
@@ -495,16 +496,32 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const handleDismissal = (batsmanType: 'striker' | 'non-striker', runs: number, dismissalStatus: BatsmanStatus, isRunOut: boolean = false) => {
-    if (!liveMatch || !liveMatch.currentBowler) return;
+    if (!liveMatch) return;
     
     // Process runs first, and flag it as a run-out wicket event for display
     _updateScore(runs, true, false, true, false, isRunOut);
     
     // We need to get the latest state after _updateScore runs, as it modifies it
-    const match = { ...liveMatch! }; 
-
+    let match = { ...liveMatch }; 
+    if(!match.currentBowler) {
+      const bowlingTeam = match.teams.find(t => t.name !== match.scorecard?.[`inning${match.currentInning}` as 'inning1' | 'inning2']?.team)
+      if(bowlingTeam) {
+        const lastBowler = bowlingTeam.players.find(p => p.id === match.previousBowlerId);
+        if(lastBowler) match.currentBowler = lastBowler
+        else match.currentBowler = bowlingTeam.players[0]
+      }
+    }
     const batsmanToDismiss = match.currentBatsmen[batsmanType];
-    if (!batsmanToDismiss) return;
+    if (!batsmanToDismiss) {
+      const otherBatsmanType = batsmanType === 'striker' ? 'nonStriker' : 'striker';
+      const otherBatsman = match.currentBatsmen[otherBatsmanType];
+      if (otherBatsman) {
+        match.currentBatsmen[batsmanType] = otherBatsman;
+        match.currentBatsmen[otherBatsmanType] = null;
+      } else {
+        return;
+      }
+    }
     
     const currentInningData = match.scorecard![`inning${match.currentInning}` as 'inning1' | 'inning2'];
     const currentBattingTeam = match.teams.find(t => t.name === currentInningData.team)!;
@@ -831,7 +848,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const appData = { isAdmin, players, matches, tournaments, liveMatch, auction };
 
   return (
-    <AppContext.Provider value={{ ...appData, login, logout, addPlayer, scheduleMatch, deleteMatch, scheduleTournament, deleteTournament, registerTeamForTournament, startTournament, closeTournament, startScoringMatch, leaveLiveMatch, performToss, selectTossOption, scoreRun, scoreWicket, scoreExtra, endMatch, handleRunOut, handleRetire, calculateRankings, updateLiveMatchInState, startAuction, placeBid, setLivePlayers, calculatePointsTable }}>
+    <AppContext.Provider value={{ ...appData, login, logout, addPlayer, scheduleMatch, deleteMatch, scheduleTournament, deleteTournament, registerTeamForTournament, startTournament, closeTournament, startScoringMatch, leaveLiveMatch, performToss, selectTossOption, scoreRun, scoreWicket, scoreExtra, endMatch, handleRunOut, handleRetire, calculateRankings, updateLiveMatchInState, startAuction, placeBid, setLivePlayers, calculatePointsTable, setAuction }}>
       {children}
     </AppContext.Provider>
   );

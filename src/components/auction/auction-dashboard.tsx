@@ -13,14 +13,21 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "../ui/skeleton";
 
 export function AuctionDashboard() {
-  const { tournaments, matches, auction, startAuction, placeBid } = useAppContext();
+  const { tournaments, matches, auction, startAuction, placeBid, setAuction } = useAppContext();
   const [selectedTournamentId, setSelectedTournamentId] = useState<string>('');
   const { toast } = useToast();
   const [isClient, setIsClient] = useState(false);
-
+  
   useEffect(() => {
     setIsClient(true);
-  }, []);
+    // Check if the auction in local storage corresponds to a valid tournament
+    if (auction && tournaments.length > 0) {
+      const tournamentExists = tournaments.some(t => t.id === auction.tournamentId);
+      if (!tournamentExists) {
+        setAuction(null); // Clear invalid auction data
+      }
+    }
+  }, [auction, tournaments, setAuction]);
 
   const availableTournamentsForAuction = tournaments.filter(t => {
     // Auction can only happen for ongoing tournaments
