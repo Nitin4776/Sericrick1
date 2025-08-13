@@ -89,7 +89,20 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     const newPlayer: Omit<Player, 'id'> = {
       ...playerData,
-      stats: { matches: 0, runs: 0, wickets: 0, bestScore: 0, bestBowling: '0-0', strikeRate: 0, battingAverage: 0, bowlingEconomy: 0, ballsFaced: 0, oversBowled: 0, runsConceded: 0 }
+      stats: { 
+        matches: 0, 
+        runs: 0, 
+        wickets: 0, 
+        bestScore: 0, 
+        bestBowling: '0-0', 
+        strikeRate: 0, 
+        battingAverage: 0, 
+        bowlingEconomy: 0, 
+        ballsFaced: 0, 
+        oversBowled: 0, 
+        runsConceded: 0,
+        timesOut: 0,
+      }
     };
     await addDoc(collection(db, "players"), newPlayer);
     return true;
@@ -323,7 +336,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             }
         }
         
-        const existingStats = player.stats || { matches: 0, runs: 0, wickets: 0, ballsFaced: 0, oversBowled: 0, runsConceded: 0, bestScore: 0, bestBowling: '0-0' };
+        const existingStats = player.stats || { matches: 0, runs: 0, wickets: 0, ballsFaced: 0, oversBowled: 0, runsConceded: 0, bestScore: 0, bestBowling: '0-0', timesOut: 0 };
         
         const newMatches = (existingStats.matches || 0) + 1;
         const newRuns = (existingStats.runs || 0) + runsScored;
@@ -420,6 +433,3 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
-
-
-    
