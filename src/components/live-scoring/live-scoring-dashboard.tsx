@@ -15,7 +15,18 @@ import { Label } from "../ui/label";
 import { Badge } from "../ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 function PlayerSelectionCard({ title, children }: { title: string, children: React.ReactNode }) {
     return (
@@ -233,12 +244,47 @@ function LiveScorecard() {
     )
 }
 
+function EndMatchDialog({ open, onOpenChange, onConfirm }: { open: boolean, onOpenChange: (open: boolean) => void, onConfirm: (reason: string) => void }) {
+    const [reason, setReason] = useState("Match Forfeited");
+
+    return (
+        <AlertDialog open={open} onOpenChange={onOpenChange}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>End Match Early?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        This action will finalize the match. Please select a reason for ending the match before its natural conclusion. This will be recorded as the official result.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <RadioGroup defaultValue={reason} onValueChange={setReason} className="my-4 space-y-2">
+                    <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="Match Forfeited" id="r1" />
+                        <Label htmlFor="r1">Match Forfeited</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="Bad Weather" id="r2" />
+                        <Label htmlFor="r2">Bad Weather / Poor Conditions</Label>
+                    </div>
+                     <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="Match Abandoned" id="r3" />
+                        <Label htmlFor="r3">Match Abandoned (Other)</Label>
+                    </div>
+                </RadioGroup>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => onConfirm(reason)}>Confirm & End Match</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    );
+}
 
 export function LiveScoringDashboard() {
   const { matches, liveMatch, startScoringMatch, performToss, selectTossOption, scoreRun, scoreWicket, scoreExtra, endMatch, setLivePlayers, players, leaveLiveMatch } = useAppContext();
   const router = useRouter();
   const [selectedMatchId, setSelectedMatchId] = useState<string>('');
   const [isClient, setIsClient] = useState(false);
+  const [isEndMatchDialogOpen, setIsEndMatchDialogOpen] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
@@ -265,6 +311,11 @@ export function LiveScoringDashboard() {
       setLivePlayers(liveMatch.currentBatsmen.striker.id as string, liveMatch.currentBatsmen.nonStriker.id as string, bowlerId);
     }
   };
+  
+  const handleEndMatchConfirm = (reason: string) => {
+    endMatch(reason);
+    setIsEndMatchDialogOpen(false);
+  }
 
   const scheduledMatches = matches.filter(m => m.status === 'scheduled');
 
@@ -295,7 +346,7 @@ export function LiveScoringDashboard() {
                 <SelectTrigger><SelectValue placeholder="Select a match..." /></SelectTrigger>
                 <SelectContent>
                 {scheduledMatches.map(match => (
-                    <SelectItem key={match.id as string} value={match.id.toString()}>
+                    <SelectItem key={match.id} value={match.id}>
                     {match.teams[0].name} vs {match.teams[1].name}
                     </SelectItem>
                 ))}
@@ -320,6 +371,23 @@ export function LiveScoringDashboard() {
   const overEvents = liveMatch.overEvents || [];
 
   const renderContent = () => {
+    if (liveMatch.status === 'completed') {
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-primary"><Info className="h-5 w-5" />Match Over</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <Alert className="border-primary">
+                        <AlertTitle className="font-bold">Match Finished!</AlertTitle>
+                        <AlertDescription>{liveMatch.result}</AlertDescription>
+                    </Alert>
+                    <Button onClick={leaveLiveMatch} className="mt-4">Back to Match List</Button>
+                </CardContent>
+            </Card>
+        );
+    }
+    
     if (isMatchStarting) {
        return (
             <Card>
@@ -462,13 +530,20 @@ export function LiveScoringDashboard() {
                 </CardContent>
             )}
              <CardFooter>
-                 {liveMatch.status !== 'completed' && <Button variant="link" onClick={endMatch}>End & Finalize Match</Button>}
+                 {liveMatch.status !== 'completed' && <Button variant="link" onClick={() => setIsEndMatchDialogOpen(true)}>End & Finalize Match</Button>}
             </CardFooter>
         </Card>
 
         {renderContent()}
         
         {currentInningData?.team && <LiveScorecard />}
+
+        <EndMatchDialog 
+            open={isEndMatchDialogOpen} 
+            onOpenChange={setIsEndMatchDialogOpen} 
+            onConfirm={handleEndMatchConfirm} 
+        />
     </div>
   );
 }
+

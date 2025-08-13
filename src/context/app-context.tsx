@@ -39,7 +39,7 @@ type AppContextType = AppData & {
   scoreRun: (runs: number, isDeclared?: boolean) => void;
   scoreWicket: () => void;
   scoreExtra: (type: 'Wide' | 'No Ball') => void;
-  endMatch: () => void;
+  endMatch: (reason?: string) => void;
   calculateRankings: () => { bestBatsmen: Player[]; bestBowlers: Player[]; bestAllrounders: Player[]; };
   updateLiveMatchInState: (liveMatch: LiveMatch | null) => void;
   startAuction: (tournamentId: string) => void;
@@ -119,7 +119,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   
   const scheduleMatch = async (matchData: Omit<Match, 'id' | 'status' | 'result' | 'playerOfTheMatch' | 'scorecard'>) => {
     const docRef = await addDoc(collection(db, "matches"), {});
-    const newMatch: Omit<Match, 'id'> = {
+    const newMatch: Match = {
       ...matchData,
       id: docRef.id,
       status: 'scheduled',
@@ -367,9 +367,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     let event = isWicket ? 'W' : `${runs}`;
     if (isExtra) event += 'wd'; // simplified for now
-    if (!match.overEvents) {
-      match.overEvents = [];
-    }
     match.overEvents.push(event);
     
     currentBattingTeam.runs += runs;
@@ -415,6 +412,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     currentBattingTeam.overs = parseFloat((match.currentOver + (match.ballsInOver * 0.1)).toFixed(1));
 
+    // Win condition check for second innings
+    if (match.currentInning === 2) {
+      const team1Score = match.scorecard!.inning1.team ? match.teams.find(t => t.name === match.scorecard!.inning1.team)!.runs : 0;
+      if (currentBattingTeam.runs > team1Score) {
+          endMatch();
+          return;
+      }
+    }
+
     if (currentBattingTeam.wickets === (currentBattingTeam.players.length - 1) || match.currentOver >= match.overs) {
         endInning();
     } else {
@@ -457,10 +463,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   }
 
-  const endMatch = async () => {
+  const endMatch = async (reason?: string) => {
     if(!liveMatch) return;
 
-    const matchRef = doc(db, "matches", liveMatch.id);
+    const matchRef = doc(db, "matches", liveMatch.id as string);
     const matchDoc = await getDoc(matchRef);
 
     if (!matchDoc.exists()) {
@@ -469,16 +475,24 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const match: Match = { ...liveMatch };
-    const team1 = match.teams[0];
-    const team2 = match.teams[1];
 
-    if (team1.runs > team2.runs) {
-        match.result = `${team1.name} won by ${team1.runs - team2.runs} runs`;
-    } else if (team2.runs > team1.runs) {
-        const wicketsLeft = team2.players.length - 1 - team2.wickets;
-        match.result = `${team2.name} won by ${wicketsLeft} wickets`;
+    if (reason) {
+        match.result = reason;
     } else {
-        match.result = "Match Tied";
+        const team1 = match.teams[0];
+        const team2 = match.teams[1];
+        const team1Score = match.scorecard?.inning1.team === team1.name ? team1.runs : team2.runs;
+        const team2Score = match.scorecard?.inning1.team === team2.name ? team1.runs : team2.runs;
+
+        if (team1Score > team2Score) {
+            match.result = `${team1.name} won by ${team1Score - team2Score} runs`;
+        } else if (team2Score > team1Score) {
+            const chasingTeam = match.scorecard?.inning2.team === team2.name ? team2 : team1;
+            const wicketsLeft = chasingTeam.players.length - 1 - chasingTeam.wickets;
+            match.result = `${chasingTeam.name} won by ${wicketsLeft} wickets`;
+        } else {
+            match.result = "Match Tied";
+        }
     }
     match.status = 'completed';
 
@@ -541,23 +555,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
     }
     
-    const finalMatchData: Partial<Match> = {
-        ...match,
-        scorecard: match.scorecard || null,
-        result: match.result,
-        status: match.status,
-    }
-    delete (finalMatchData as any).currentBatsmen;
-    delete (finalMatchData as any).currentBowler;
-    delete (finalMatchData as any).currentInning;
-    delete (finalMatchData as any).currentOver;
-    delete (finalMatchData as any).ballsInOver;
-    delete (finalMatchData as any).overEvents;
-    delete (finalMatchData as any).previousBowlerId;
-    delete (finalMatchData as any).tossWinner;
+    const finalMatchData: Partial<LiveMatch> = { ...match };
+    delete finalMatchData.currentBatsmen;
+    delete finalMatchData.currentBowler;
+    delete finalMatchData.currentInning;
+    delete finalMatchData.currentOver;
+    delete finalMatchData.ballsInOver;
+    delete finalMatchData.overEvents;
+    delete finalMatchData.previousBowlerId;
+    delete finalMatchData.tossWinner;
 
 
-    batch.update(matchRef, finalMatchData);
+    batch.update(matchRef, finalMatchData as any);
     
     await batch.commit();
 
@@ -568,7 +577,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         })
     );
 
-    setLiveMatch(null);
+    setLiveMatch(currentLiveMatch => currentLiveMatch ? {...currentLiveMatch, status: 'completed', result: match.result } : null);
   };
 
   const calculateRankings = () => {
@@ -593,7 +602,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }));
 
     const newAuction: Auction = {
-        tournamentId,
+        tournamentId: String(tournamentId),
         tournamentName: tournament.name,
         players: playersForAuction,
         teams: []
@@ -629,3 +638,4 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
+
