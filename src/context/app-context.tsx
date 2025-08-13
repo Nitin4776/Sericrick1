@@ -278,32 +278,35 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const matchDoc = await getDoc(doc(db, "matches", matchId));
     if (!matchDoc.exists()) return;
     
-    const matchData = matchDoc.data();
-    const match = { ...matchData, id: matchDoc.id } as Match;
+    let matchData = matchDoc.data() as Match;
+
+    if (liveMatch?.id === matchId) {
+      matchData = liveMatch;
+    }
     
-    if (!match || !players.length) return;
+    if (!matchData || !players.length) return;
   
     const getPlayerById = (playerId: string | { id: string }) => {
         const pId = typeof playerId === 'object' ? playerId.id : playerId;
         return players.find(p => p.id === pId);
     }
   
-    const team1Players = match.teams[0].players.map(p_id => getPlayerById(p_id as any)).filter(p => p) as Player[];
-    const team2Players = match.teams[1].players.map(p_id => getPlayerById(p_id as any)).filter(p => p) as Player[];
+    const team1Players = matchData.teams[0].players.map(p_id => getPlayerById(p_id as any)).filter(p => p) as Player[];
+    const team2Players = matchData.teams[1].players.map(p_id => getPlayerById(p_id as any)).filter(p => p) as Player[];
   
     const liveMatchData: LiveMatch = {
-      ...JSON.parse(JSON.stringify(match)),
-      id: String(match.id),
+      ...JSON.parse(JSON.stringify(matchData)),
+      id: String(matchData.id),
       teams: [
-        { ...match.teams[0], players: team1Players },
-        { ...match.teams[1], players: team2Players }
+        { ...matchData.teams[0], players: team1Players },
+        { ...matchData.teams[1], players: team2Players }
       ],
       status: 'live',
-      scorecard: {
+      scorecard: matchData.scorecard ? matchData.scorecard : {
         inning1: { team: null, batsmen: {}, bowlers: {}, extraRuns: 0, runs: 0, wickets: 0, overs: 0 },
         inning2: { team: null, batsmen: {}, bowlers: {}, extraRuns: 0, runs: 0, wickets: 0, overs: 0 }
       },
-      currentInning: 1,
+      currentInning: matchData.scorecard?.inning1.team && !matchData.scorecard?.inning2.team ? 2 : 1,
       currentBatsmen: { striker: null, nonStriker: null },
       currentBowler: null,
       previousBowlerId: null,
@@ -311,8 +314,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       ballsInOver: 0,
       overEvents: [],
     };
+
+    if(matchData.scorecard && matchData.scorecard.inning1.team) {
+      liveMatchData.currentOver = Math.floor(matchData.scorecard.inning1.overs);
+    }
+
     setLiveMatch(liveMatchData);
-    await updateDoc(doc(db, "matches", matchId), { status: 'live' });
+    if (matchData.status !== 'live') {
+      await updateDoc(doc(db, "matches", matchId), { status: 'live' });
+    }
   };
 
   const leaveLiveMatch = () => {
@@ -321,6 +331,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   
   const updateLiveMatchInState = (liveMatchData: LiveMatch | null) => {
     setLiveMatch(liveMatchData);
+    if (liveMatchData && liveMatchData.status === 'live') {
+      const matchRef = doc(db, "matches", liveMatchData.id as string);
+      updateDoc(matchRef, {
+        scorecard: liveMatchData.scorecard,
+        teams: liveMatchData.teams.map(t => ({...t, players: t.players.map(p => p.id)})) // Store player IDs
+      });
+    }
   }
 
   const performToss = () => {
@@ -784,5 +801,3 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
-
-    

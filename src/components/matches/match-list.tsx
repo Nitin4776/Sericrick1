@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -9,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScorecardDialog } from "./scorecard-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Radio, CheckCircle, Calendar, PlayCircle, Trash2 } from "lucide-react";
+import { Radio, CheckCircle, Calendar, PlayCircle, Trash2, BarChart2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,7 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export function MatchList() {
-  const { matches, isAdmin, startScoringMatch, deleteMatch } = useAppContext();
+  const { matches, isAdmin, startScoringMatch, deleteMatch, liveMatch } = useAppContext();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -36,6 +37,15 @@ export function MatchList() {
         title: "Live scoring started!",
         description: "You are now in the live scoring dashboard."
     });
+    router.push('/live-scoring');
+  };
+  
+  const handleViewLiveScorecard = (matchId: string) => {
+    // If the user is already scoring this match, just navigate.
+    // Otherwise, start scoring to load it into the live context.
+    if (liveMatch?.id !== matchId) {
+        startScoringMatch(matchId);
+    }
     router.push('/live-scoring');
   };
 
@@ -81,12 +91,25 @@ export function MatchList() {
                   <div className="flex items-center gap-2 mb-1">{getStatusBadge(m.status)}</div>
                   <p className="font-bold">{m.teams[0].name} vs {m.teams[1].name}</p>
                   <p className="text-xs text-muted-foreground">{m.venue}, {m.overs} Overs</p>
+                  
+                  {m.status === 'live' && m.scorecard && (
+                    <div className="text-sm mt-2 font-mono flex flex-wrap gap-x-4 gap-y-1">
+                        <span>{m.scorecard.inning1.team}: {m.scorecard.inning1.runs}/{m.scorecard.inning1.wickets} ({m.scorecard.inning1.overs.toFixed(1)})</span>
+                        {m.scorecard.inning2.team && <span>{m.scorecard.inning2.team}: {m.scorecard.inning2.runs}/{m.scorecard.inning2.wickets} ({m.scorecard.inning2.overs.toFixed(1)})</span>}
+                    </div>
+                  )}
+
                   {m.result && <p className="text-xs text-primary font-semibold mt-1">{m.result}</p>}
                 </div>
                 <div className="flex space-x-2 shrink-0">
                   {m.status === 'scheduled' && isAdmin && (
                     <Button onClick={() => handleStartScoring(m.id as string)} size="sm">
                         <PlayCircle className="h-4 w-4 mr-2" /> Start Scoring
+                    </Button>
+                  )}
+                  {m.status === 'live' && isAdmin && (
+                    <Button onClick={() => handleViewLiveScorecard(m.id as string)} size="sm">
+                        <BarChart2 className="h-4 w-4 mr-2" /> View Live Scorecard
                     </Button>
                   )}
                   {m.status === 'completed' && (
