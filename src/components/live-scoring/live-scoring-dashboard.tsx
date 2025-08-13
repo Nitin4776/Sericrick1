@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -6,21 +7,50 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useEffect, useState } from "react";
-import type { Match } from "@/lib/types";
+import type { Match, Player } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Coins } from "lucide-react";
+import { Coins, User, Shield } from "lucide-react";
 import { Skeleton } from "../ui/skeleton";
+import { Label } from "../ui/label";
+
+function PlayerSelector({ players, selectedPlayer, onSelect, otherSelectedPlayer, label }: { players: Player[], selectedPlayer: Player | null, onSelect: (id: string) => void, otherSelectedPlayer?: Player | null, label: string }) {
+    return (
+        <div className="space-y-2">
+            <Label>{label}</Label>
+            <Select onValueChange={onSelect} value={selectedPlayer?.id as string | undefined}>
+                <SelectTrigger><SelectValue placeholder={`Select ${label}...`} /></SelectTrigger>
+                <SelectContent>
+                    {players.map(p => (
+                        <SelectItem key={p.id as string} value={p.id as string} disabled={otherSelectedPlayer?.id === p.id}>
+                            {p.name}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        </div>
+    )
+}
+
 
 export function LiveScoringDashboard() {
-  const { matches, liveMatch, startScoringMatch, performToss, selectTossOption, scoreRun, scoreWicket, scoreExtra, endMatch } = useAppContext();
+  const { matches, liveMatch, startScoringMatch, performToss, selectTossOption, scoreRun, scoreWicket, scoreExtra, endMatch, setLivePlayers } = useAppContext();
   const router = useRouter();
   const [selectedMatchId, setSelectedMatchId] = useState<string>('');
   const [isClient, setIsClient] = useState(false);
+
+  // States for player selection
+  const [strikerId, setStrikerId] = useState<string>('');
+  const [nonStrikerId, setNonStrikerId] = useState<string>('');
+  const [bowlerId, setBowlerId] = useState<string>('');
+  
 
   useEffect(() => {
     setIsClient(true);
     if (liveMatch) {
       setSelectedMatchId(liveMatch.id.toString());
+      setStrikerId(liveMatch.currentBatsmen.striker?.id as string || '');
+      setNonStrikerId(liveMatch.currentBatsmen.nonStriker?.id as string || '');
+      setBowlerId(liveMatch.currentBowler?.id as string || '');
     }
   }, [liveMatch]);
 
@@ -30,6 +60,12 @@ export function LiveScoringDashboard() {
     }
   };
   
+  const handleSetPlayers = () => {
+    if (strikerId && nonStrikerId && bowlerId) {
+      setLivePlayers(strikerId, nonStrikerId, bowlerId);
+    }
+  };
+
   const scheduledMatches = matches.filter(m => m.status === 'scheduled');
 
   if (!isClient) {
@@ -71,6 +107,12 @@ export function LiveScoringDashboard() {
       </Card>
     );
   }
+  
+  const currentInningData = liveMatch.scorecard?.[`inning${liveMatch.currentInning}` as 'inning1' | 'inning2'];
+  const battingTeam = liveMatch.teams.find(t => t.name === currentInningData?.team);
+  const bowlingTeam = liveMatch.teams.find(t => t.name !== currentInningData?.team);
+  const arePlayersSet = liveMatch.currentBatsmen.striker && liveMatch.currentBatsmen.nonStriker && liveMatch.currentBowler;
+
 
   return (
     <div className="space-y-6">
@@ -113,12 +155,30 @@ export function LiveScoringDashboard() {
                     )}
                 </CardContent>
             </Card>
+        ) : !arePlayersSet ? (
+            <Card>
+                <CardHeader><CardTitle>Set Opening Players</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                    {battingTeam && bowlingTeam && (
+                        <>
+                            <PlayerSelector players={battingTeam.players} label="On-Strike Batsman" selectedPlayer={players.find(p => p.id === strikerId) || null} onSelect={setStrikerId} otherSelectedPlayer={players.find(p => p.id === nonStrikerId) || null}/>
+                            <PlayerSelector players={battingTeam.players} label="Non-Strike Batsman" selectedPlayer={players.find(p => p.id === nonStrikerId) || null} onSelect={setNonStrikerId} otherSelectedPlayer={players.find(p => p.id === strikerId) || null}/>
+                            <PlayerSelector players={bowlingTeam.players} label="Bowler" selectedPlayer={players.find(p => p.id === bowlerId) || null} onSelect={setBowlerId} />
+                            <Button onClick={handleSetPlayers} disabled={!strikerId || !nonStrikerId || !bowlerId}>Confirm Players</Button>
+                        </>
+                    )}
+                </CardContent>
+            </Card>
         ) : (
             <Card>
                 <CardHeader>
                     <CardTitle>Ball-by-Ball Scoring</CardTitle>
                     <CardDescription>
-                       Current Batsman: {liveMatch.currentBatsmen.striker?.name} | Bowler: {liveMatch.currentBowler?.name}
+                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                           <span className="flex items-center"><User className="mr-1 h-4 w-4 text-primary"/>Striker: {liveMatch.currentBatsmen.striker?.name}</span>
+                           <span className="flex items-center"><User className="mr-1 h-4 w-4 text-muted-foreground"/>Non-Striker: {liveMatch.currentBatsmen.nonStriker?.name}</span>
+                           <span className="flex items-center"><Shield className="mr-1 h-4 w-4 text-primary"/>Bowler: {liveMatch.currentBowler?.name}</span>
+                       </div>
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -134,6 +194,7 @@ export function LiveScoringDashboard() {
                         <Button variant="destructive" onClick={scoreWicket}>Wicket</Button>
                         <Button variant="secondary" onClick={() => scoreExtra('Wide')}>Wide</Button>
                         <Button variant="secondary" onClick={() => scoreExtra('No Ball')}>No Ball</Button>
+                        <Button variant="outline" onClick={() => scoreRun(1, true)}>Declare 1 Run</Button>
                     </div>
                 </CardContent>
             </Card>

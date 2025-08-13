@@ -31,7 +31,7 @@ type AppContextType = AppData & {
   startScoringMatch: (matchId: string) => void;
   performToss: () => void;
   selectTossOption: (option: 'Bat' | 'Bowl') => void;
-  scoreRun: (runs: number) => void;
+  scoreRun: (runs: number, isDeclared?: boolean) => void;
   scoreWicket: () => void;
   scoreExtra: (type: 'Wide' | 'No Ball') => void;
   endMatch: () => void;
@@ -39,6 +39,7 @@ type AppContextType = AppData & {
   updateLiveMatchInState: (liveMatch: LiveMatch | null) => void;
   startAuction: (tournamentId: string) => void;
   placeBid: (playerId: number, bidAmount: number, teamName: string) => boolean;
+  setLivePlayers: (strikerId: string, nonStrikerId: string, bowlerId: string) => void;
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -192,16 +193,31 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     match.scorecard!.inning1.team = match.teams[battingFirstIndex].name;
     match.scorecard!.inning2.team = match.teams[bowlingFirstIndex].name;
 
-    const battingTeam = match.teams[battingFirstIndex];
-    const bowlingTeam = match.teams[bowlingFirstIndex];
-    
-    match.currentBatsmen = { striker: battingTeam.players[0], nonStriker: battingTeam.players[1] };
-    match.currentBowler = bowlingTeam.players[bowlingTeam.players.length - 1];
+    updateLiveMatchInState(match);
+  };
+  
+  const setLivePlayers = (strikerId: string, nonStrikerId: string, bowlerId: string) => {
+    if (!liveMatch || !liveMatch.scorecard?.inning1.team) return;
 
+    let match = { ...liveMatch };
+
+    const battingTeamName = match.scorecard[`inning${match.currentInning}` as 'inning1' | 'inning2'].team;
+    const battingTeam = match.teams.find(t => t.name === battingTeamName);
+    const bowlingTeam = match.teams.find(t => t.name !== battingTeamName);
+
+    if (!battingTeam || !bowlingTeam) return;
+
+    const striker = battingTeam.players.find(p => p.id === strikerId) || null;
+    const nonStriker = battingTeam.players.find(p => p.id === nonStrikerId) || null;
+    const bowler = bowlingTeam.players.find(p => p.id === bowlerId) || null;
+    
+    match.currentBatsmen = { striker, nonStriker };
+    match.currentBowler = bowler;
+    
     updateLiveMatchInState(match);
   };
 
-  const _updateScore = (runs: number, isWicket: boolean, isExtra: boolean, isLegalBall: boolean) => {
+  const _updateScore = (runs: number, isWicket: boolean, isExtra: boolean, isLegalBall: boolean, isDeclared: boolean = false) => {
     if(!liveMatch) return;
     let match = { ...liveMatch };
     const currentInningData = match.scorecard![`inning${match.currentInning}` as 'inning1' | 'inning2'];
@@ -242,7 +258,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
              const nextBatsman = currentBattingTeam.players.find(p => !currentInningData.batsmen[p.id]?.out && p.id !== match.currentBatsmen.nonStriker?.id);
              match.currentBatsmen.striker = nextBatsman || null;
         }
-    } else if (runs % 2 !== 0 && !isExtra) {
+    } else if (runs % 2 !== 0 && !isExtra && !isDeclared) {
         [match.currentBatsmen.striker, match.currentBatsmen.nonStriker] = [match.currentBatsmen.nonStriker, match.currentBatsmen.striker];
     }
     
@@ -275,7 +291,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const scoreRun = (runs: number) => _updateScore(runs, false, false, true);
+  const scoreRun = (runs: number, isDeclared: boolean = false) => _updateScore(runs, false, false, true, isDeclared);
   const scoreWicket = () => _updateScore(0, true, false, true);
   const scoreExtra = (type: 'Wide' | 'No Ball') => _updateScore(1, false, true, type === 'No Ball');
 
@@ -442,7 +458,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const appData = { isAdmin, players, matches, tournaments, liveMatch, auction };
 
   return (
-    <AppContext.Provider value={{ ...appData, login, logout, addPlayer, scheduleMatch, deleteMatch, scheduleTournament, deleteTournament, startScoringMatch, performToss, selectTossOption, scoreRun, scoreWicket, scoreExtra, endMatch, calculateRankings, updateLiveMatchInState, startAuction, placeBid }}>
+    <AppContext.Provider value={{ ...appData, login, logout, addPlayer, scheduleMatch, deleteMatch, scheduleTournament, deleteTournament, startScoringMatch, performToss, selectTossOption, scoreRun, scoreWicket, scoreExtra, endMatch, calculateRankings, updateLiveMatchInState, startAuction, placeBid, setLivePlayers }}>
       {children}
     </AppContext.Provider>
   );
