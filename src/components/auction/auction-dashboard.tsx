@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useAppContext } from "@/context/app-context";
@@ -29,7 +30,7 @@ export function AuctionDashboard() {
     }
   };
 
-  const handlePlaceBid = (playerId: number) => {
+  const handlePlaceBid = (playerId: string) => {
     const bidAmountInput = document.getElementById(`bid-amount-${playerId}`) as HTMLInputElement;
     const teamNameInput = document.getElementById(`bid-team-${playerId}`) as HTMLInputElement;
 
@@ -121,7 +122,7 @@ export function AuctionDashboard() {
                                     <div className="flex gap-2">
                                         <Input type="number" id={`bid-amount-${p.id}`} placeholder="Amount" className="w-24 h-9" />
                                         <Input id={`bid-team-${p.id}`} placeholder="Team Name" className="w-32 h-9" />
-                                        <Button size="sm" onClick={() => handlePlaceBid(p.id as number)}>Bid</Button>
+                                        <Button size="sm" onClick={() => handlePlaceBid(p.id as string)}>Bid</Button>
                                     </div>
                                 )}
                             </TableCell>

@@ -43,7 +43,7 @@ type AppContextType = AppData & {
   calculateRankings: () => { bestBatsmen: Player[]; bestBowlers: Player[]; bestAllrounders: Player[]; };
   updateLiveMatchInState: (liveMatch: LiveMatch | null) => void;
   startAuction: (tournamentId: string) => void;
-  placeBid: (playerId: number, bidAmount: number, teamName: string) => boolean;
+  placeBid: (playerId: string, bidAmount: number, teamName: string) => boolean;
   setLivePlayers: (strikerId: string, nonStrikerId: string, bowlerId: string) => void;
 };
 
@@ -60,15 +60,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const unsubPlayers = onSnapshot(collection(db, "players"), (snapshot) => {
-      setPlayers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Player)));
+      setPlayers(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as unknown as Player)));
     });
     const unsubMatches = onSnapshot(query(collection(db, "matches")), (snapshot) => {
-        const fetchedMatches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Match));
+        const fetchedMatches = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as unknown as Match));
         fetchedMatches.sort((a,b) => String(a.id).localeCompare(String(b.id)));
         setMatches(fetchedMatches);
     });
     const unsubTournaments = onSnapshot(collection(db, "tournaments"), (snapshot) => {
-      setTournaments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Tournament)));
+      setTournaments(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as unknown as Tournament)));
     });
 
     return () => {
@@ -97,7 +97,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return false; // Player already exists
     }
 
-    const newPlayer: Omit<Player, 'id'> = {
+    const docRef = await addDoc(collection(db, "players"), {});
+
+    const newPlayer: Player = {
+      id: docRef.id,
       ...playerData,
       stats: { 
         matches: 0, 
@@ -113,7 +116,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         timesOut: 0,
       }
     };
-    await addDoc(collection(db, "players"), newPlayer);
+    await updateDoc(docRef, newPlayer as any);
     return true;
   };
   
@@ -140,17 +143,19 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return;
     }
     setMatches(prevMatches => prevMatches.filter(match => match.id !== matchId));
-    await deleteDoc(doc(db, "matches", matchId));
+    await deleteDoc(doc(db, "matches", String(matchId)));
   };
 
   const scheduleTournament = async (tournamentData: Omit<Tournament, 'id' | 'teams' | 'status' | 'scheduledMatches'>) => {
-    const newTournament: Omit<Tournament, 'id'> = {
+    const docRef = await addDoc(collection(db, "tournaments"), {});
+    const newTournament: Tournament = {
+      id: docRef.id,
       ...tournamentData,
       teams: [],
       status: 'scheduled',
       scheduledMatches: []
     };
-    await addDoc(collection(db, "tournaments"), newTournament);
+    await updateDoc(docRef, newTournament as any);
   };
   
   const registerTeamForTournament = async (tournamentId: string, teamData: Omit<TeamInTournament, 'id'>): Promise<boolean> => {
@@ -273,7 +278,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const matchDoc = await getDoc(doc(db, "matches", matchId));
     if (!matchDoc.exists()) return;
     
-    const match = { id: matchDoc.id, ...matchDoc.data() } as Match;
+    const matchData = matchDoc.data();
+    const match = { ...matchData, id: matchDoc.id } as Match;
     
     if (!match || !players.length) return;
   
@@ -287,7 +293,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   
     const liveMatchData: LiveMatch = {
       ...JSON.parse(JSON.stringify(match)),
-      id: matchId,
+      id: String(match.id),
       teams: [
         { ...match.teams[0], players: team1Players },
         { ...match.teams[1], players: team2Players }
@@ -650,7 +656,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setAuction(newAuction);
   };
   
-  const placeBid = (playerId: number, bidAmount: number, teamName: string) => {
+  const placeBid = (playerId: string, bidAmount: number, teamName: string) => {
     if (!auction) return false;
 
     const newAuction = { ...auction };

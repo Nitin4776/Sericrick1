@@ -78,6 +78,7 @@ export interface Match {
 }
 
 export interface LiveMatch extends Match {
+  id: string;
   tossWinner?: number;
   currentInning: 1 | 2;
   currentBatsmen: {
@@ -123,6 +124,7 @@ export interface Tournament {
 }
 
 export interface AuctionPlayer extends Player {
+  id: string;
   status: 'Unsold' | 'Sold';
   bidder: string | null;
   bidAmount: number;
