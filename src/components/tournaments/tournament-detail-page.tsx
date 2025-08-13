@@ -292,13 +292,13 @@ export function TournamentDetailPageClient({ tournament }: { tournament: Tournam
                         <span className="flex items-center gap-2"><Users /> {tournament.playersPerTeam} players/team</span>
                         <span className="flex items-center gap-2"><MapPin /> {tournament.venue}</span>
                         <span className="flex items-center gap-2">
-                          <Calendar /> {isClient ? formattedDates : <Skeleton className="h-4 w-40" />}
+                          <Calendar /> {formattedDates}
                         </span>
                         <Badge variant={tournament.status === 'completed' ? 'secondary' : 'default'} className="capitalize">{tournament.status}</Badge>
                     </div>
                     {tournament.description && <p className="mt-4 text-muted-foreground max-w-2xl">{tournament.description}</p>}
                 </div>
-                {isAdmin && (
+                {isClient && isAdmin && (
                     <div className="flex gap-2">
                         {tournament.status === 'scheduled' && (
                             <Button onClick={handleStartTournament}>
@@ -310,6 +310,11 @@ export function TournamentDetailPageClient({ tournament }: { tournament: Tournam
                                 <StopCircle className="mr-2 h-4 w-4"/> Close Tournament
                             </Button>
                         )}
+                    </div>
+                )}
+                 {!isClient && (
+                    <div className="flex gap-2">
+                        <Skeleton className="h-10 w-40" />
                     </div>
                 )}
             </div>
