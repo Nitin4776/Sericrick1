@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, where, getDocs, writeBatch, getDoc, arrayUnion } from 'firebase/firestore';
-import type { AppData, Player, Match, Tournament, LiveMatch, AuctionPlayer, Auction, PlayerStats, TeamInTournament, TeamInMatch } from '@/lib/types';
+import type { AppData, Player, Match, Tournament, LiveMatch, AuctionPlayer, Auction, PlayerStats, TeamInTournament, TeamInMatch, ScorecardInning } from '@/lib/types';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
 
@@ -127,7 +127,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       playerOfTheMatch: null,
       scorecard: null,
     };
-    await updateDoc(docRef, newMatch);
+    await updateDoc(docRef, newMatch as any);
   };
 
   const deleteMatch = async (matchId: string) => {
@@ -268,8 +268,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: "Tournament Closed", description: "The tournament has been marked as completed."});
   };
 
-  const startScoringMatch = (matchId: string) => {
-    const match = matches.find(m => m.id === matchId);
+  const startScoringMatch = async (matchId: string) => {
+    const matchDoc = await getDoc(doc(db, "matches", matchId));
+    if (!matchDoc.exists()) return;
+    
+    const match = { id: matchDoc.id, ...matchDoc.data() } as Match;
+    
     if (!match || !players.length) return;
   
     const getPlayerById = (playerId: string | { id: string }) => {
@@ -289,8 +293,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       ],
       status: 'live',
       scorecard: {
-        inning1: { team: null, batsmen: {}, bowlers: {}, extraRuns: 0 },
-        inning2: { team: null, batsmen: {}, bowlers: {}, extraRuns: 0 }
+        inning1: { team: null, batsmen: {}, bowlers: {}, extraRuns: 0, runs: 0, wickets: 0, overs: 0 },
+        inning2: { team: null, batsmen: {}, bowlers: {}, extraRuns: 0, runs: 0, wickets: 0, overs: 0 }
       },
       currentInning: 1,
       currentBatsmen: { striker: null, nonStriker: null },
@@ -301,6 +305,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       overEvents: [],
     };
     setLiveMatch(liveMatchData);
+    await updateDoc(doc(db, "matches", matchId), { status: 'live' });
   };
 
   const leaveLiveMatch = () => {
@@ -411,6 +416,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
 
     currentBattingTeam.overs = parseFloat((match.currentOver + (match.ballsInOver * 0.1)).toFixed(1));
+    currentInningData.runs = currentBattingTeam.runs;
+    currentInningData.wickets = currentBattingTeam.wickets;
+    currentInningData.overs = currentBattingTeam.overs;
+
 
     // Win condition check for second innings
     if (match.currentInning === 2) {
@@ -463,6 +472,34 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   }
 
+  const calculatePlayerOfTheMatch = (match: Match): string => {
+    let potmPlayerId = '';
+    let maxScore = -1;
+    let maxWickets = -1;
+
+    const innings = [match.scorecard?.inning1, match.scorecard?.inning2];
+    for(const inning of innings) {
+        if(inning) {
+            for(const p of Object.values(inning.batsmen)) {
+                if(p.runs > maxScore) {
+                    maxScore = p.runs;
+                    potmPlayerId = p.playerId;
+                }
+            }
+             for(const p of Object.values(inning.bowlers)) {
+                if(p.wickets > maxWickets) {
+                    maxWickets = p.wickets;
+                    // crude logic - wickets more valuable
+                    if (p.wickets * 20 > maxScore) {
+                         potmPlayerId = p.playerId;
+                    }
+                }
+            }
+        }
+    }
+    return potmPlayerId;
+  }
+
   const endMatch = async (reason?: string) => {
     if(!liveMatch) return;
 
@@ -495,6 +532,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }
     }
     match.status = 'completed';
+    match.playerOfTheMatch = calculatePlayerOfTheMatch(match);
+
 
     const batch = writeBatch(db);
     const allPlayerIdsInMatch = [...new Set([...match.teams[0].players.map(p => p.id), ...match.teams[1].players.map(p => p.id)])];
@@ -577,7 +616,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         })
     );
 
-    setLiveMatch(currentLiveMatch => currentLiveMatch ? {...currentLiveMatch, status: 'completed', result: match.result } : null);
+    setLiveMatch(currentLiveMatch => currentLiveMatch ? {...currentLiveMatch, status: 'completed', result: match.result, playerOfTheMatch: match.playerOfTheMatch } : null);
   };
 
   const calculateRankings = () => {
@@ -638,4 +677,3 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
-

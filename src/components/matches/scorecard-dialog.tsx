@@ -18,7 +18,7 @@ interface ScorecardDialogProps {
   onOpenChange: (isOpen: boolean) => void;
 }
 
-const InningScorecard = ({ inningData, battingTeamName, bowlingTeamName }: { inningData: ScorecardInning, battingTeamName: string, bowlingTeamName: string }) => {
+const InningScorecard = ({ inningData, battingTeamName }: { inningData: ScorecardInning, battingTeamName: string }) => {
     const { players } = useAppContext();
     if (!inningData || !inningData.team) return null;
 
@@ -31,7 +31,7 @@ const InningScorecard = ({ inningData, battingTeamName, bowlingTeamName }: { inn
         <div className="space-y-6">
             <div>
                 <h4 className="font-semibold text-lg">{battingTeamName} Innings</h4>
-                <p className="text-muted-foreground">{inningData.team}</p>
+                <p className="text-muted-foreground">{inningData.team} - {inningData.runs}/{inningData.wickets} ({inningData.overs.toFixed(1)} ov)</p>
             </div>
             <div>
                 <h5 className="font-semibold mb-2">Batting</h5>
@@ -90,11 +90,17 @@ const InningScorecard = ({ inningData, battingTeamName, bowlingTeamName }: { inn
 };
 
 export function ScorecardDialog({ match, isOpen, onOpenChange }: ScorecardDialogProps) {
+  const { players } = useAppContext();
   if (!match) return null;
 
-  const getPlayerName = (players: Player[], id: string) => players.find(p => p.id === id)?.name || id;
+  const getPlayerName = (playersList: Player[], id: string) => {
+    const player = playersList.find(p => p.id === id);
+    return player ? player.name : 'Unknown Player';
+  };
 
-  const playerOfTheMatchName = match.playerOfTheMatch ? getPlayerName(match.teams[0].players.concat(match.teams[1].players), match.playerOfTheMatch) : '';
+  const allPlayersInMatch = match.teams.flatMap(t => t.players);
+
+  const playerOfTheMatchName = match.playerOfTheMatch ? getPlayerName(allPlayersInMatch, match.playerOfTheMatch) : 'N/A';
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -108,8 +114,8 @@ export function ScorecardDialog({ match, isOpen, onOpenChange }: ScorecardDialog
         </DialogHeader>
         <ScrollArea className="h-[60vh] p-4">
             <div className="space-y-8">
-                {match.scorecard?.inning1.team && <InningScorecard inningData={match.scorecard.inning1} battingTeamName={match.scorecard.inning1.team} bowlingTeamName={match.scorecard.inning2.team!} />}
-                {match.scorecard?.inning2.team && <InningScorecard inningData={match.scorecard.inning2} battingTeamName={match.scorecard.inning2.team} bowlingTeamName={match.scorecard.inning1.team!} />}
+                {match.scorecard?.inning1.team && <InningScorecard inningData={match.scorecard.inning1} battingTeamName={match.scorecard.inning1.team} />}
+                {match.scorecard?.inning2.team && <InningScorecard inningData={match.scorecard.inning2} battingTeamName={match.scorecard.inning2.team} />}
             </div>
         </ScrollArea>
       </DialogContent>

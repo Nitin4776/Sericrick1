@@ -16,7 +16,7 @@ export interface PlayerStats {
 }
 
 export interface Player {
-  id: number | string;
+  id: string;
   name: string;
   gender: 'Male' | 'Female' | 'Other';
   role: 'Batsman' | 'Bowler' | 'All-rounder';
@@ -55,6 +55,9 @@ export interface ScorecardInning {
     };
   };
   extraRuns: number;
+  runs: number;
+  wickets: number;
+  overs: number;
 }
 
 export interface Scorecard {
@@ -82,7 +85,7 @@ export interface LiveMatch extends Match {
     nonStriker: Player | null;
   };
   currentBowler: Player | null;
-  previousBowlerId: string | number | null;
+  previousBowlerId: string | null;
   currentOver: number;
   ballsInOver: number;
   overEvents: string[];
@@ -102,7 +105,7 @@ export type TournamentFormat =
   | 'League Table';
 
 export interface Tournament {
-  id: number | string;
+  id: string;
   name: string;
   venue: string;
   description: string;
@@ -124,7 +127,7 @@ export interface AuctionPlayer extends Player {
 }
 
 export interface Auction {
-  tournamentId: number | string;
+  tournamentId: string;
   tournamentName: string;
   players: AuctionPlayer[];
   teams: any[]; // Replace with a Team type if needed

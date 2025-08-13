@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useEffect, useState } from "react";
 import type { Match, Player, ScorecardInning } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Coins, User, Shield, Info, ArrowLeft, BarChart, Users } from "lucide-react";
+import { Coins, User, Shield, Info, ArrowLeft, BarChart, Users, Trophy } from "lucide-react";
 import { Skeleton } from "../ui/skeleton";
 import { Label } from "../ui/label";
 import { Badge } from "../ui/badge";
@@ -24,7 +24,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
@@ -279,16 +278,45 @@ function EndMatchDialog({ open, onOpenChange, onConfirm }: { open: boolean, onOp
     );
 }
 
+function MatchCompletedDialog({ open, onOpenChange, result }: { open: boolean, onOpenChange: (open: boolean) => void, result: string | null }) {
+    return (
+      <AlertDialog open={open} onOpenChange={onOpenChange}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex justify-center">
+                <Trophy className="h-16 w-16 text-yellow-500" />
+            </div>
+            <AlertDialogTitle className="text-center text-2xl">Match Finished!</AlertDialogTitle>
+            <AlertDialogDescription className="text-center text-lg">
+              {result}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => onOpenChange(false)}>Close</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    );
+}
+
+
 export function LiveScoringDashboard() {
   const { matches, liveMatch, startScoringMatch, performToss, selectTossOption, scoreRun, scoreWicket, scoreExtra, endMatch, setLivePlayers, players, leaveLiveMatch } = useAppContext();
   const router = useRouter();
   const [selectedMatchId, setSelectedMatchId] = useState<string>('');
   const [isClient, setIsClient] = useState(false);
   const [isEndMatchDialogOpen, setIsEndMatchDialogOpen] = useState(false);
+  const [isMatchCompletedDialogOpen, setMatchCompletedDialogOpen] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  useEffect(() => {
+    if (liveMatch?.status === 'completed') {
+        setMatchCompletedDialogOpen(true);
+    }
+  }, [liveMatch?.status]);
 
   const handleStart = () => {
     if (selectedMatchId) {
@@ -524,7 +552,7 @@ export function LiveScoringDashboard() {
              {liveMatch.result && (
                 <CardContent>
                     <Alert className="border-primary">
-                        <AlertTitle className="font-bold">Match Finished!</AlertTitle>
+                        <AlertTitle className="font-bold">Match Result</AlertTitle>
                         <AlertDescription>{liveMatch.result}</AlertDescription>
                     </Alert>
                 </CardContent>
@@ -543,7 +571,11 @@ export function LiveScoringDashboard() {
             onOpenChange={setIsEndMatchDialogOpen} 
             onConfirm={handleEndMatchConfirm} 
         />
+        <MatchCompletedDialog 
+            open={isMatchCompletedDialogOpen}
+            onOpenChange={setMatchCompletedDialogOpen}
+            result={liveMatch.result}
+        />
     </div>
   );
 }
-
