@@ -355,7 +355,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const currentInningData = match.scorecard![`inning${match.currentInning}` as 'inning1' | 'inning2'];
     const currentBattingTeam = match.teams.find(t => t.name === currentInningData.team)!;
     
-    // Add event to over history
     let event = isWicket ? 'W' : `${runs}`;
     if (isExtra) event += 'wd'; // simplified for now
     match.overEvents.push(event);
@@ -391,9 +390,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         match.currentOver += 1;
         bowlerStats.overs = parseFloat((Math.floor(bowlerStats.overs) + 1).toFixed(1));
         match.ballsInOver = 0;
-        match.overEvents = []; // Clear events for next over
+        match.overEvents = [];
         
-        // Rotate strike at end of over
         [match.currentBatsmen.striker, match.currentBatsmen.nonStriker] = [match.currentBatsmen.nonStriker, match.currentBatsmen.striker];
         
         match.previousBowlerId = match.currentBowler.id;
@@ -403,7 +401,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
 
     currentBattingTeam.overs = parseFloat((match.currentOver + (match.ballsInOver * 0.1)).toFixed(1));
-
 
     if (currentBattingTeam.wickets === (currentBattingTeam.players.length - 1) || match.currentOver >= match.overs) {
         endInning();
@@ -415,7 +412,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const scoreRun = (runs: number, isDeclared: boolean = false) => _updateScore(runs, false, false, true, isDeclared);
   const scoreWicket = () => _updateScore(0, true, false, true);
   const scoreExtra = (type: 'Wide' | 'No Ball') => {
-    const isLegal = type === 'No Ball'; // No ball is a legal delivery in some formats for runs, but doesn't count to over. Here we make it not count.
+    const isLegal = type === 'No Ball';
     _updateScore(1, false, true, isLegal);
   }
 
@@ -454,7 +451,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const matchDoc = await getDoc(matchRef);
 
     if (!matchDoc.exists()) {
-      setLiveMatch(null); // Clear the stale live match data
+      setLiveMatch(null);
       return;
     }
 
@@ -619,3 +616,5 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
+
+    

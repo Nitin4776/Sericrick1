@@ -4,15 +4,18 @@
 import { useRouter } from "next/navigation";
 import { useAppContext } from "@/context/app-context";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useEffect, useState } from "react";
-import type { Match, Player } from "@/lib/types";
+import type { Match, Player, ScorecardInning } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Coins, User, Shield, Info, ArrowLeft } from "lucide-react";
+import { Coins, User, Shield, Info, ArrowLeft, BarChart, Users } from "lucide-react";
 import { Skeleton } from "../ui/skeleton";
 import { Label } from "../ui/label";
 import { Badge } from "../ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 
 function PlayerSelectionCard({ title, children }: { title: string, children: React.ReactNode }) {
     return (
@@ -25,8 +28,16 @@ function PlayerSelectionCard({ title, children }: { title: string, children: Rea
     );
 }
 
-function PlayerSelector({ players, selectedPlayer, onSelect, otherSelectedPlayer, label, disabled = false, availablePlayers }: { players: Player[], selectedPlayer: Player | null, onSelect: (id: string) => void, otherSelectedPlayer?: Player | null, label: string, disabled?: boolean, availablePlayers?: Player[] }) {
+function PlayerSelector({ players, selectedPlayer, onSelect, otherSelectedPlayer, label, disabled = false, availablePlayers, scorecard }: { players: Player[], selectedPlayer: Player | null, onSelect: (id: string) => void, otherSelectedPlayer?: Player | null, label: string, disabled?: boolean, availablePlayers?: Player[], scorecard?: ScorecardInning }) {
     const playerList = availablePlayers || players;
+
+    const getBowlerOvers = (playerId: string) => {
+        if (!scorecard || !scorecard.bowlers[playerId]) {
+            return "0.0";
+        }
+        return scorecard.bowlers[playerId].overs.toFixed(1);
+    };
+
     return (
         <div className="space-y-2">
             <Label>{label}</Label>
@@ -35,7 +46,7 @@ function PlayerSelector({ players, selectedPlayer, onSelect, otherSelectedPlayer
                 <SelectContent>
                     {playerList.map(p => (
                         <SelectItem key={p.id as string} value={p.id as string} disabled={otherSelectedPlayer?.id === p.id}>
-                            {p.name}
+                            {p.name} {label === "Bowler" && `(${getBowlerOvers(p.id as string)} ov)`}
                         </SelectItem>
                     ))}
                 </SelectContent>
@@ -80,7 +91,9 @@ function PlayerSetup({ onConfirm }: { onConfirm: (strikerId: string, nonStrikerI
                 players={bowlingTeam.players} 
                 label="Bowler" 
                 selectedPlayer={bowlingTeam.players.find(p => p.id === bowlerId) || null} 
-                onSelect={setBowlerId} />
+                onSelect={setBowlerId}
+                scorecard={currentInningData}
+                 />
             <Button onClick={() => onConfirm(strikerId, nonStrikerId, bowlerId)} disabled={!strikerId || !nonStrikerId || !bowlerId}>Confirm Players</Button>
         </PlayerSelectionCard>
     );
@@ -125,7 +138,6 @@ function NewBowlerSelector({ onConfirm }: { onConfirm: (bowlerId: string) => voi
     
     if (!bowlingTeam) return null;
 
-    // Prevent the previous bowler from bowling consecutive overs
     const availableBowlers = bowlingTeam.players.filter(p => p.id !== liveMatch.previousBowlerId);
 
     return (
@@ -133,13 +145,91 @@ function NewBowlerSelector({ onConfirm }: { onConfirm: (bowlerId: string) => voi
              <PlayerSelector 
                 players={bowlingTeam.players}
                 availablePlayers={availableBowlers}
-                label="New Bowler" 
+                label="Bowler" 
                 selectedPlayer={bowlingTeam.players.find(p => p.id === newBowlerId) || null} 
                 onSelect={setNewBowlerId}
+                scorecard={currentInningData}
             />
             <Button onClick={() => onConfirm(newBowlerId)} disabled={!newBowlerId}>Confirm Bowler</Button>
         </PlayerSelectionCard>
     );
+}
+
+function LiveScorecard() {
+    const { liveMatch, players } = useAppContext();
+
+    if (!liveMatch) return null;
+
+    const getPlayerName = (id: string) => players.find(p => p.id === id)?.name || 'Unknown Player';
+
+    const renderInning = (inningData: ScorecardInning, inningNum: number) => {
+        if (!inningData || !inningData.team) return null;
+
+        const batsmen = Object.values(inningData.batsmen).sort((a,b) => a.balls > 0 ? -1 : 1);
+        const bowlers = Object.values(inningData.bowlers);
+
+        return (
+            <TabsContent value={`inning${inningNum}`}>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>{inningData.team} Innings</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div>
+                            <h4 className="font-semibold mb-2 flex items-center gap-2"><Users />Batting</h4>
+                             <Table>
+                                <TableHeader><TableRow><TableHead>Batsman</TableHead><TableHead>R</TableHead><TableHead>B</TableHead><TableHead>4s</TableHead><TableHead>6s</TableHead><TableHead>SR</TableHead></TableRow></TableHeader>
+                                <TableBody>
+                                    {batsmen.map(b => (
+                                        <TableRow key={b.playerId}>
+                                            <TableCell>{getPlayerName(b.playerId)}{b.out && <span className="text-destructive text-xs ml-2">out</span>}</TableCell>
+                                            <TableCell>{b.runs}</TableCell>
+                                            <TableCell>{b.balls}</TableCell>
+                                            <TableCell>{b.fours}</TableCell>
+                                            <TableCell>{b.sixes}</TableCell>
+                                            <TableCell>{(b.balls > 0 ? (b.runs / b.balls * 100) : 0).toFixed(2)}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                         <div>
+                            <h4 className="font-semibold mb-2 flex items-center gap-2"><Shield />Bowling</h4>
+                             <Table>
+                                <TableHeader><TableRow><TableHead>Bowler</TableHead><TableHead>O</TableHead><TableHead>R</TableHead><TableHead>W</TableHead><TableHead>Econ</TableHead></TableRow></TableHeader>
+                                <TableBody>
+                                     {bowlers.map(b => (
+                                        <TableRow key={b.playerId}>
+                                            <TableCell>{getPlayerName(b.playerId)}</TableCell>
+                                            <TableCell>{b.overs.toFixed(1)}</TableCell>
+                                            <TableCell>{b.runs}</TableCell>
+                                            <TableCell>{b.wickets}</TableCell>
+                                            <TableCell>{(b.overs > 0 ? b.runs / b.overs : 0).toFixed(2)}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </CardContent>
+                </Card>
+            </TabsContent>
+        )
+    }
+
+    return (
+        <Tabs defaultValue="inning1" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="inning1" disabled={!liveMatch.scorecard?.inning1.team}>
+                    {liveMatch.scorecard?.inning1.team || "Inning 1"}
+                </TabsTrigger>
+                 <TabsTrigger value="inning2" disabled={!liveMatch.scorecard?.inning2.team}>
+                    {liveMatch.scorecard?.inning2.team || "Inning 2"}
+                </TabsTrigger>
+            </TabsList>
+            {renderInning(liveMatch.scorecard!.inning1, 1)}
+            {renderInning(liveMatch.scorecard!.inning2, 2)}
+        </Tabs>
+    )
 }
 
 
@@ -171,7 +261,6 @@ export function LiveScoringDashboard() {
 
   const handleSetNewBowler = (bowlerId: string) => {
     if (liveMatch?.currentBatsmen.striker && liveMatch?.currentBatsmen.nonStriker) {
-      // The strike has already rotated in the state, so we use the new striker/non-striker
       setLivePlayers(liveMatch.currentBatsmen.striker.id as string, liveMatch.currentBatsmen.nonStriker.id as string, bowlerId);
     }
   };
@@ -222,7 +311,7 @@ export function LiveScoringDashboard() {
   
   const arePlayersSet = liveMatch.currentBatsmen.striker && liveMatch.currentBatsmen.nonStriker && liveMatch.currentBowler;
   const isWicketFallen = liveMatch.currentBatsmen.striker === null && liveMatch.currentBatsmen.nonStriker !== null;
-  const isOverFinished = liveMatch.currentBowler === null && liveMatch.ballsInOver === 0 && (liveMatch.currentOver > 0 || (liveMatch.currentOver === 0 && liveMatch.currentInning === 2)); // End of over
+  const isOverFinished = liveMatch.currentBowler === null && liveMatch.ballsInOver === 0 && (liveMatch.currentOver > 0 || (liveMatch.currentOver === 0 && liveMatch.ballsInOver === 0 && currentInningData.team != null));
   
   const inningStarted = !!currentInningData?.team;
   const isMatchStarting = !inningStarted;
@@ -325,6 +414,20 @@ export function LiveScoringDashboard() {
     );
   }
 
+  const getTeamScore = (teamName: string | null | undefined) => {
+    if (!teamName || !liveMatch?.teams) return { runs: 0, wickets: 0, overs: 0.0 };
+    const teamData = liveMatch.teams.find(t => t.name === teamName);
+    return {
+      runs: teamData?.runs ?? 0,
+      wickets: teamData?.wickets ?? 0,
+      overs: teamData?.overs?.toFixed(1) ?? '0.0',
+    };
+  };
+
+  const inning1Score = getTeamScore(liveMatch.scorecard?.inning1.team);
+  const inning2Score = getTeamScore(liveMatch.scorecard?.inning2.team);
+
+
   return (
     <div className="space-y-6">
         <Card>
@@ -334,19 +437,19 @@ export function LiveScoringDashboard() {
                         <CardTitle>Live Match: {liveMatch.teams[0].name} vs {liveMatch.teams[1].name}</CardTitle>
                         <CardDescription>{liveMatch.venue}, {liveMatch.overs} Overs</CardDescription>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={leaveLiveMatch}><ArrowLeft className="mr-2"/> Back to All Matches</Button>
+                    <Button variant="ghost" size="sm" onClick={leaveLiveMatch}><ArrowLeft className="mr-2"/> Back to Match List</Button>
                 </div>
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="p-4 bg-muted rounded-lg">
-                    <h4 className="font-semibold text-lg">{liveMatch.scorecard?.inning1.team || 'Team 1'}</h4>
-                    <p className="text-3xl font-bold">{liveMatch.teams.find(t => t.name === liveMatch.scorecard?.inning1.team)?.runs ?? '0'} / {liveMatch.teams.find(t => t.name === liveMatch.scorecard?.inning1.team)?.wickets ?? '0'}</p>
-                    <p className="text-sm text-muted-foreground">Overs: {liveMatch.teams.find(t => t.name === liveMatch.scorecard?.inning1.team)?.overs.toFixed(1) ?? '0.0'}</p>
+                    <h4 className="font-semibold text-lg">{liveMatch.scorecard?.inning1.team || 'Inning 1'}</h4>
+                    <p className="text-3xl font-bold">{inning1Score.runs} / {inning1Score.wickets}</p>
+                    <p className="text-sm text-muted-foreground">Overs: {inning1Score.overs}</p>
                 </div>
                  <div className="p-4 bg-muted rounded-lg">
-                    <h4 className="font-semibold text-lg">{liveMatch.scorecard?.inning2.team || 'Team 2'}</h4>
-                    <p className="text-3xl font-bold">{liveMatch.teams.find(t => t.name === liveMatch.scorecard?.inning2.team)?.runs ?? '0'} / {liveMatch.teams.find(t => t.name === liveMatch.scorecard?.inning2.team)?.wickets ?? '0'}</p>
-                    <p className="text-sm text-muted-foreground">Overs: {liveMatch.teams.find(t => t.name === liveMatch.scorecard?.inning2.team)?.overs.toFixed(1) ?? '0.0'}</p>
+                    <h4 className="font-semibold text-lg">{liveMatch.scorecard?.inning2.team || 'Inning 2'}</h4>
+                    <p className="text-3xl font-bold">{inning2Score.runs} / {inning2Score.wickets}</p>
+                    <p className="text-sm text-muted-foreground">Overs: {inning2Score.overs}</p>
                 </div>
             </CardContent>
              {liveMatch.result && (
@@ -357,11 +460,16 @@ export function LiveScoringDashboard() {
                     </Alert>
                 </CardContent>
             )}
+             <CardFooter>
+                 {liveMatch.status !== 'completed' && <Button variant="link" onClick={endMatch}>End & Finalize Match</Button>}
+            </CardFooter>
         </Card>
 
         {renderContent()}
-
-        {liveMatch.status !== 'completed' && <Button variant="link" onClick={endMatch}>End & Finalize Match</Button>}
+        
+        {currentInningData?.team && <LiveScorecard />}
     </div>
   );
 }
+
+    
