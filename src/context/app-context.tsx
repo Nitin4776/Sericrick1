@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, where, getDocs, writeBatch, getDoc, arrayUnion } from 'firebase/firestore';
-import type { AppData, Player, Match, Tournament, LiveMatch, AuctionPlayer, Auction, PlayerStats, TeamInTournament, TeamInMatch, ScorecardInning } from '@/lib/types';
+import type { AppData, Player, Match, Tournament, LiveMatch, AuctionPlayer, Auction, PlayerStats, TeamInTournament, TeamInMatch, ScorecardInning, PointsTableEntry } from '@/lib/types';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
 
@@ -45,6 +45,7 @@ type AppContextType = AppData & {
   startAuction: (tournamentId: string) => void;
   placeBid: (playerId: string, bidAmount: number, teamName: string) => boolean;
   setLivePlayers: (strikerId: string, nonStrikerId: string, bowlerId: string) => void;
+  calculatePointsTable: (tournament: Tournament) => PointsTableEntry[];
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -64,7 +65,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
     const unsubMatches = onSnapshot(query(collection(db, "matches")), (snapshot) => {
         const fetchedMatches = snapshot.docs.map(doc => ({ ...doc.data(), id: String(doc.id) } as unknown as Match));
-        setMatches(fetchedMatches);
+        setMatches(fetchedMatches.sort((a, b) => (String(a.id) > String(b.id)) ? 1 : -1));
     });
     const unsubTournaments = onSnapshot(collection(db, "tournaments"), (snapshot) => {
       setTournaments(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as unknown as Tournament)));
@@ -141,7 +142,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         });
         return;
     }
-    setMatches(prevMatches => prevMatches.filter(match => match.id !== matchId));
+    setMatches(prevMatches => prevMatches.filter(match => String(match.id) !== String(matchId)));
     await deleteDoc(doc(db, "matches", String(matchId)));
   };
 
@@ -409,7 +410,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         currentBattingTeam.wickets += 1;
         bowlerStats.wickets += 1;
         batsmanStats.out = true;
-        match.currentBatsmen.striker = null; // Prompt for new batsman
+        if (wasLastBallOfOver) {
+            match.currentBatsmen.striker = null;
+            match.previousBowlerId = match.currentBowler.id;
+            match.currentBowler = null; // Also need to select a new bowler
+        } else {
+            match.currentBatsmen.striker = null; // Prompt for new batsman
+        }
     } else if (runs % 2 !== 0 && !isExtra && !isDeclared) {
         [match.currentBatsmen.striker, match.currentBatsmen.nonStriker] = [match.currentBatsmen.nonStriker, match.currentBatsmen.striker];
     }
@@ -425,8 +432,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           [match.currentBatsmen.striker, match.currentBatsmen.nonStriker] = [match.currentBatsmen.nonStriker, match.currentBatsmen.striker];
         }
         
-        match.previousBowlerId = match.currentBowler.id;
-        match.currentBowler = null; // Prompt for new bowler
+        // Don't nullify bowler if wicket fell on last ball, because we already did.
+        if (!isWicket) {
+            match.previousBowlerId = match.currentBowler.id;
+            match.currentBowler = null; // Prompt for new bowler
+        }
     } else {
          bowlerStats.overs = parseFloat((Math.floor(bowlerStats.overs) + (match.ballsInOver / 10)).toFixed(1));
     }
@@ -645,6 +655,87 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return { bestBatsmen, bestBowlers, bestAllrounders };
   }
   
+  const calculatePointsTable = (tournament: Tournament): PointsTableEntry[] => {
+    const tournamentMatches = matches.filter(m => m.tournamentId === tournament.id && m.status === 'completed');
+    const table: { [teamName: string]: PointsTableEntry } = {};
+
+    // Initialize table for all registered teams
+    tournament.teams.forEach(team => {
+        table[team.name] = {
+            teamName: team.name,
+            played: 0,
+            won: 0,
+            lost: 0,
+            noResult: 0,
+            points: 0,
+            runsScored: 0,
+            oversFaced: 0,
+            runsConceded: 0,
+            oversBowled: 0,
+            nrr: 0,
+        };
+    });
+
+    tournamentMatches.forEach(match => {
+        if (!match.result || !match.scorecard) return;
+
+        const team1Name = match.teams[0].name;
+        const team2Name = match.teams[1].name;
+        
+        if(!table[team1Name] || !table[team2Name]) return;
+
+        const winner = match.result.includes(team1Name) ? team1Name : match.result.includes(team2Name) ? team2Name : null;
+        
+        const processTeam = (teamName: string, isWinner: boolean | null) => {
+            if (table[teamName]) {
+                table[teamName].played += 1;
+                if (isWinner === true) {
+                    table[teamName].won += 1;
+                    table[teamName].points += 2;
+                } else if (isWinner === false) {
+                    table[teamName].lost += 1;
+                } else {
+                    table[teamName].noResult += 1;
+                    table[teamName].points += 1;
+                }
+            }
+        };
+
+        if (winner) {
+            processTeam(winner, true);
+            processTeam(winner === team1Name ? team2Name : team1Name, false);
+        } else {
+            processTeam(team1Name, null);
+            processTeam(team2Name, null);
+        }
+
+        // NRR Calculation
+        const { inning1, inning2 } = match.scorecard;
+        if (inning1.team && inning2.team && table[inning1.team] && table[inning2.team]) {
+            table[inning1.team].runsScored += inning1.runs;
+            table[inning1.team].oversFaced += inning1.overs;
+            table[inning1.team].runsConceded += inning2.runs;
+            table[inning1.team].oversBowled += inning2.overs;
+
+            table[inning2.team].runsScored += inning2.runs;
+            table[inning2.team].oversFaced += inning2.overs;
+            table[inning2.team].runsConceded += inning1.runs;
+            table[inning2.team].oversBowled += inning1.overs;
+        }
+    });
+
+    // Final NRR calculation and sorting
+    const finalTable = Object.values(table);
+    finalTable.forEach(entry => {
+        const scoredRate = entry.oversFaced > 0 ? entry.runsScored / entry.oversFaced : 0;
+        const concededRate = entry.oversBowled > 0 ? entry.runsConceded / entry.oversBowled : 0;
+        entry.nrr = scoredRate - concededRate;
+    });
+
+    return finalTable.sort((a, b) => b.points - a.points || b.nrr - a.nrr);
+  };
+
+
   const startAuction = (tournamentId: string) => {
     const tournament = tournaments.find(t => t.id === tournamentId);
     if (!tournament) return;
@@ -680,7 +771,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const appData = { isAdmin, players, matches, tournaments, liveMatch, auction };
 
   return (
-    <AppContext.Provider value={{ ...appData, login, logout, addPlayer, scheduleMatch, deleteMatch, scheduleTournament, deleteTournament, registerTeamForTournament, startTournament, closeTournament, startScoringMatch, leaveLiveMatch, performToss, selectTossOption, scoreRun, scoreWicket, scoreExtra, endMatch, calculateRankings, updateLiveMatchInState, startAuction, placeBid, setLivePlayers }}>
+    <AppContext.Provider value={{ ...appData, login, logout, addPlayer, scheduleMatch, deleteMatch, scheduleTournament, deleteTournament, registerTeamForTournament, startTournament, closeTournament, startScoringMatch, leaveLiveMatch, performToss, selectTossOption, scoreRun, scoreWicket, scoreExtra, endMatch, calculateRankings, updateLiveMatchInState, startAuction, placeBid, setLivePlayers, calculatePointsTable }}>
       {children}
     </AppContext.Provider>
   );
@@ -693,3 +784,5 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
+
+    

@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAppContext } from "@/context/app-context";
-import type { Player, Match } from "@/lib/types";
+import type { Player, Match, PointsTableEntry } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,12 +15,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Calendar, MapPin, Trophy, PlusCircle, ArrowLeft, BarChart2, Play, StopCircle, Swords } from "lucide-react";
-import React from "react";
+import { Users, Calendar, MapPin, Trophy, PlusCircle, ArrowLeft, BarChart2, Play, StopCircle, Swords, Award } from "lucide-react";
+import React, { useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import Link from "next/link";
 
 
 const createTeamSchema = (playersPerTeam: number) => z.object({
@@ -31,12 +30,12 @@ const createTeamSchema = (playersPerTeam: number) => z.object({
 
 type TeamFormValues = z.infer<ReturnType<typeof createTeamSchema>>;
 
-function PointsTable({ tournament }: { tournament: any }) {
+function PointsTable({ tournament, pointsTable }: { tournament: any, pointsTable: PointsTableEntry[] }) {
     return (
         <Card>
             <CardHeader>
                 <CardTitle>Points Table</CardTitle>
-                <CardDescription>Standings for the {tournament.format} stage.</CardDescription>
+                <CardDescription>Standings for the {tournament.name}.</CardDescription>
             </CardHeader>
             <CardContent>
                 <Table>
@@ -53,23 +52,22 @@ function PointsTable({ tournament }: { tournament: any }) {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {/* Placeholder Data */}
-                         {tournament.teams.map((team: any, index: number) => (
-                             <TableRow key={team.id}>
+                         {pointsTable.map((entry: PointsTableEntry, index: number) => (
+                             <TableRow key={entry.teamName}>
                                  <TableCell>{index + 1}</TableCell>
-                                 <TableCell className="font-medium">{team.name}</TableCell>
-                                 <TableCell className="text-center">0</TableCell>
-                                 <TableCell className="text-center">0</TableCell>
-                                 <TableCell className="text-center">0</TableCell>
-                                 <TableCell className="text-center">0</TableCell>
-                                 <TableCell className="text-center font-bold">0</TableCell>
-                                 <TableCell>+0.000</TableCell>
+                                 <TableCell className="font-medium">{entry.teamName}</TableCell>
+                                 <TableCell className="text-center">{entry.played}</TableCell>
+                                 <TableCell className="text-center">{entry.won}</TableCell>
+                                 <TableCell className="text-center">{entry.lost}</TableCell>
+                                 <TableCell className="text-center">{entry.noResult}</TableCell>
+                                 <TableCell className="text-center font-bold">{entry.points}</TableCell>
+                                 <TableCell>{entry.nrr.toFixed(3)}</TableCell>
                              </TableRow>
                          ))}
-                         {tournament.teams.length === 0 && (
+                         {pointsTable.length === 0 && (
                             <TableRow>
                                 <TableCell colSpan={8} className="text-center text-muted-foreground">
-                                    No teams have registered yet.
+                                    No matches have been completed yet.
                                 </TableCell>
                             </TableRow>
                          )}
@@ -78,6 +76,64 @@ function PointsTable({ tournament }: { tournament: any }) {
             </CardContent>
         </Card>
     );
+}
+
+function TournamentResult({ tournament, pointsTable, allPlayers }: { tournament: any, pointsTable: PointsTableEntry[], allPlayers: Player[] }) {
+    if (tournament.status !== 'completed' || pointsTable.length === 0) {
+        return null;
+    }
+
+    const winner = pointsTable[0];
+    // A simple way to determine player of the tournament
+    const tournamentMatches = tournament.scheduledMatches || [];
+    const playerStats: { [playerId: string]: { runs: number, wickets: number, name: string } } = {};
+
+    allPlayers.forEach(p => {
+        playerStats[p.id] = { runs: 0, wickets: 0, name: p.name };
+    });
+
+    matches.filter(m => tournamentMatches.includes(m.id)).forEach(m => {
+        if(m.scorecard) {
+            Object.values(m.scorecard.inning1.batsmen).forEach(b => {
+                if(playerStats[b.playerId]) playerStats[b.playerId].runs += b.runs;
+            });
+             Object.values(m.scorecard.inning1.bowlers).forEach(b => {
+                if(playerStats[b.playerId]) playerStats[b.playerId].wickets += b.wickets;
+            });
+             Object.values(m.scorecard.inning2.batsmen).forEach(b => {
+                if(playerStats[b.playerId]) playerStats[b.playerId].runs += b.runs;
+            });
+             Object.values(m.scorecard.inning2.bowlers).forEach(b => {
+                if(playerStats[b.playerId]) playerStats[b.playerId].wickets += b.wickets;
+            });
+        }
+    });
+
+    const playerOfTheTournament = Object.values(playerStats).sort((a, b) => (b.runs + b.wickets * 20) - (a.runs + a.wickets * 20))[0];
+
+    return (
+        <Card className="border-primary">
+            <CardHeader>
+                <CardTitle className="text-primary flex items-center gap-2"><Trophy/> Tournament Finished!</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <div className="text-center">
+                    <p className="text-muted-foreground">Winner</p>
+                    <p className="text-3xl font-bold">{winner.teamName}</p>
+                </div>
+                <div className="text-center">
+                    <p className="text-muted-foreground">Player of the Tournament</p>
+                    <p className="text-2xl font-bold flex items-center justify-center gap-2">
+                        <Award className="text-amber-500" /> 
+                        {playerOfTheTournament.name}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                        {playerOfTheTournament.runs} Runs & {playerOfTheTournament.wickets} Wickets
+                    </p>
+                </div>
+            </CardContent>
+        </Card>
+    )
 }
 
 function ScheduledMatches({ tournament, allMatches }: { tournament: any, allMatches: Match[] }) {
@@ -132,7 +188,7 @@ function ScheduledMatches({ tournament, allMatches }: { tournament: any, allMatc
 export default function TournamentDetailPage() {
   const { id } = useParams();
   const router = useRouter();
-  const { tournaments, players, matches, registerTeamForTournament, isAdmin, startTournament, closeTournament } = useAppContext();
+  const { tournaments, players, matches, registerTeamForTournament, isAdmin, startTournament, closeTournament, calculatePointsTable } = useAppContext();
   const { toast } = useToast();
 
   const tournament = tournaments.find(t => t.id === id);
@@ -140,6 +196,11 @@ export default function TournamentDetailPage() {
   const teamSchema = React.useMemo(() => {
     return createTeamSchema(tournament?.playersPerTeam || 5);
   }, [tournament?.playersPerTeam]);
+
+  const pointsTable = useMemo(() => {
+    if (!tournament) return [];
+    return calculatePointsTable(tournament);
+  }, [tournament, matches, calculatePointsTable]);
 
 
   const form = useForm<TeamFormValues>({
@@ -239,6 +300,7 @@ export default function TournamentDetailPage() {
             <TabsContent value="teams">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-6">
                     <div className="lg:col-span-2 space-y-6">
+                        <TournamentResult tournament={tournament} pointsTable={pointsTable} allPlayers={players} />
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2"><Users /> Registered Teams ({tournament.teams.length})</CardTitle>
@@ -338,7 +400,7 @@ export default function TournamentDetailPage() {
             </TabsContent>
             <TabsContent value="points">
                  <div className="mt-6">
-                    <PointsTable tournament={tournament} />
+                    <PointsTable tournament={tournament} pointsTable={pointsTable} />
                  </div>
             </TabsContent>
         </Tabs>

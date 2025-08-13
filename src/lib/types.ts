@@ -78,7 +78,6 @@ export interface Match {
 }
 
 export interface LiveMatch extends Match {
-  id: string;
   tossWinner?: number;
   currentInning: 1 | 2;
   currentBatsmen: {
@@ -135,6 +134,20 @@ export interface Auction {
   tournamentName: string;
   players: AuctionPlayer[];
   teams: any[]; // Replace with a Team type if needed
+}
+
+export interface PointsTableEntry {
+    teamName: string;
+    played: number;
+    won: number;
+    lost: number;
+    noResult: number;
+    points: number;
+    runsScored: number;
+    oversFaced: number;
+    runsConceded: number;
+    oversBowled: number;
+    nrr: number;
 }
 
 export interface AppData {
