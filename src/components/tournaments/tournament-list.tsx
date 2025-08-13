@@ -54,10 +54,12 @@ export function TournamentList() {
               <MapPin className="h-4 w-4" />
               <span>{t.venue}</span>
             </div>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Calendar className="h-4 w-4" />
-              <span>{new Date(t.dates.start).toLocaleDateString()} - {new Date(t.dates.end).toLocaleDateString()}</span>
-            </div>
+            {t.dates && (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Calendar className="h-4 w-4" />
+                <span>{new Date(t.dates.start).toLocaleDateString()} - {new Date(t.dates.end).toLocaleDateString()}</span>
+              </div>
+            )}
           </CardContent>
           <CardFooter className="flex justify-between">
             <Button variant="outline">View Details</Button>
