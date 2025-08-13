@@ -67,12 +67,12 @@ export function LiveScoringDashboard() {
                 <div className="p-4 bg-muted rounded-lg">
                     <h4 className="font-semibold text-lg">{liveMatch.teams[0].name}</h4>
                     <p className="text-3xl font-bold">{liveMatch.teams[0].runs} / {liveMatch.teams[0].wickets}</p>
-                    <p className="text-sm text-muted-foreground">Overs: {liveMatch.teams[0].overs.toFixed(1)}</p>
+                    <p className="text-sm text-muted-foreground">Overs: {typeof liveMatch.teams[0].overs === 'number' ? liveMatch.teams[0].overs.toFixed(1) : '0.0'}</p>
                 </div>
                  <div className="p-4 bg-muted rounded-lg">
                     <h4 className="font-semibold text-lg">{liveMatch.teams[1].name}</h4>
                     <p className="text-3xl font-bold">{liveMatch.teams[1].runs} / {liveMatch.teams[1].wickets}</p>
-                    <p className="text-sm text-muted-foreground">Overs: {liveMatch.teams[1].overs.toFixed(1)}</p>
+                    <p className="text-sm text-muted-foreground">Overs: {typeof liveMatch.teams[1].overs === 'number' ? liveMatch.teams[1].overs.toFixed(1) : '0.0'}</p>
                 </div>
             </CardContent>
         </Card>
