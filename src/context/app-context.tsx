@@ -4,8 +4,8 @@
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, where, getDocs } from 'firebase/firestore';
-import type { AppData, Player, Match, Tournament, LiveMatch, AuctionPlayer, Auction } from '@/lib/types';
+import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, where, getDocs, writeBatch } from 'firebase/firestore';
+import type { AppData, Player, Match, Tournament, LiveMatch, AuctionPlayer, Auction, ScorecardInning, PlayerStats } from '@/lib/types';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 
 const ADMIN_ID = 'User1';
@@ -31,7 +31,7 @@ type AppContextType = AppData & {
   performToss: () => void;
   selectTossOption: (option: 'Bat' | 'Bowl') => void;
   scoreRun: (runs: number) => void;
-  scoreWicket: (wicket: any) => void;
+  scoreWicket: () => void;
   scoreExtra: (type: 'Wide' | 'No Ball') => void;
   endMatch: () => void;
   calculateRankings: () => { bestBatsmen: Player[]; bestBowlers: Player[]; bestAllrounders: Player[]; };
@@ -89,7 +89,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     const newPlayer: Omit<Player, 'id'> = {
       ...playerData,
-      stats: { matches: 0, runs: 0, wickets: 0, bestScore: 0, bestBowling: '0-0', strikeRate: 0, battingAverage: 0, bowlingEconomy: 0 }
+      stats: { matches: 0, runs: 0, wickets: 0, bestScore: 0, bestBowling: '0-0', strikeRate: 0, battingAverage: 0, bowlingEconomy: 0, ballsFaced: 0, oversBowled: 0, runsConceded: 0 }
     };
     await addDoc(collection(db, "players"), newPlayer);
     return true;
@@ -123,18 +123,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const match = matches.find(m => m.id === matchId);
     if (!match || !players.length) return;
   
-    const getPlayerById = (playerId: string) => {
-        return players.find(p => p.id === playerId);
+    // Function to get full player object from an ID
+    const getPlayerById = (playerId: string | { id: string }) => {
+        const pId = typeof playerId === 'object' ? playerId.id : playerId;
+        return players.find(p => p.id === pId);
     }
   
-    const team1PlayerIds = match.teams[0].players as unknown as string[];
-    const team2PlayerIds = match.teams[1].players as unknown as string[];
-  
-    const team1Players = team1PlayerIds.map(getPlayerById).filter(p => p) as Player[];
-    const team2Players = team2PlayerIds.map(getPlayerById).filter(p => p) as Player[];
+    // Find the full player objects for each team
+    const team1Players = match.teams[0].players.map(p_id => getPlayerById(p_id as any)).filter(p => p) as Player[];
+    const team2Players = match.teams[1].players.map(p_id => getPlayerById(p_id as any)).filter(p => p) as Player[];
   
     const liveMatchData: LiveMatch = {
-      ...JSON.parse(JSON.stringify(match)),
+      ...JSON.parse(JSON.stringify(match)), // Deep copy to avoid mutation issues
       teams: [
         { ...match.teams[0], players: team1Players },
         { ...match.teams[1], players: team2Players }
@@ -288,7 +288,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const endMatch = async () => {
     if(!liveMatch) return;
-    let match: Match = { ...liveMatch };
+    const match: Match = { ...liveMatch };
     const team1 = match.teams[0];
     const team2 = match.teams[1];
 
@@ -302,6 +302,63 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
     match.status = 'completed';
 
+    // Update player stats
+    const batch = writeBatch(db);
+    const allPlayerIdsInMatch = [...match.teams[0].players.map(p => p.id), ...match.teams[1].players.map(p => p.id)];
+    
+    allPlayerIdsInMatch.forEach(playerId => {
+      const player = players.find(p => p.id === playerId);
+      if (player) {
+        const playerRef = doc(db, "players", playerId as string);
+        
+        let runsScored = 0, ballsFaced = 0, wicketsTaken = 0, runsConceded = 0, oversBowled = 0;
+
+        if (match.scorecard?.inning1.batsmen[playerId]) {
+          runsScored += match.scorecard.inning1.batsmen[playerId].runs;
+          ballsFaced += match.scorecard.inning1.batsmen[playerId].balls;
+        }
+        if (match.scorecard?.inning2.batsmen[playerId]) {
+            runsScored += match.scorecard.inning2.batsmen[playerId].runs;
+            ballsFaced += match.scorecard.inning2.batsmen[playerId].balls;
+        }
+        if (match.scorecard?.inning1.bowlers[playerId]) {
+            wicketsTaken += match.scorecard.inning1.bowlers[playerId].wickets;
+            runsConceded += match.scorecard.inning1.bowlers[playerId].runs;
+            oversBowled += match.scorecard.inning1.bowlers[playerId].overs;
+        }
+        if (match.scorecard?.inning2.bowlers[playerId]) {
+            wicketsTaken += match.scorecard.inning2.bowlers[playerId].wickets;
+            runsConceded += match.scorecard.inning2.bowlers[playerId].runs;
+            oversBowled += match.scorecard.inning2.bowlers[playerId].overs;
+        }
+        
+        const existingStats = player.stats || { matches: 0, runs: 0, wickets: 0, bestScore: 0, bestBowling: '0-0', strikeRate: 0, battingAverage: 0, bowlingEconomy: 0, ballsFaced: 0, oversBowled: 0, runsConceded: 0 };
+        const newMatches = (existingStats.matches || 0) + 1;
+        const newRuns = (existingStats.runs || 0) + runsScored;
+        const newBallsFaced = (existingStats.ballsFaced || 0) + ballsFaced;
+        const newWickets = (existingStats.wickets || 0) + wicketsTaken;
+        const newOversBowled = (existingStats.oversBowled || 0) + oversBowled;
+        const newRunsConceded = (existingStats.runsConceded || 0) + runsConceded;
+
+        const updatedStats: PlayerStats = {
+          matches: newMatches,
+          runs: newRuns,
+          wickets: newWickets,
+          ballsFaced: newBallsFaced,
+          oversBowled: newOversBowled,
+          runsConceded: newRunsConceded,
+          bestScore: Math.max(existingStats.bestScore || 0, runsScored),
+          bestBowling: existingStats.bestBowling, // complex logic needed
+          battingAverage: newRuns / newMatches,
+          strikeRate: newBallsFaced > 0 ? (newRuns / newBallsFaced) * 100 : 0,
+          bowlingEconomy: newOversBowled > 0 ? newRunsConceded / newOversBowled : 0,
+        };
+        batch.update(playerRef, { stats: updatedStats });
+      }
+    });
+    
+    await batch.commit();
+
     const matchRef = doc(db, "matches", match.id as string);
     await updateDoc(matchRef, { ...match });
     setLiveMatch(null);
@@ -309,9 +366,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const calculateRankings = () => {
         const playersWithStats = players.filter(p => p.stats && p.stats.matches > 0);
-        const bestBatsmen = [...playersWithStats].sort((a, b) => b.stats.runs - a.stats.runs).slice(0, 5);
-        const bestBowlers = [...playersWithStats].sort((a, b) => b.stats.wickets - a.stats.wickets).slice(0, 5);
-        const bestAllrounders = [...playersWithStats].sort((a, b) => (b.stats.runs * 0.4 + b.stats.wickets * 20) - (a.stats.runs * 0.4 + a.stats.wickets * 20)).slice(0, 5);
+        const bestBatsmen = [...playersWithStats].sort((a, b) => (b.stats.runs || 0) - (a.stats.runs || 0)).slice(0, 5);
+        const bestBowlers = [...playersWithStats].sort((a, b) => (b.stats.wickets || 0) - (a.stats.wickets || 0)).slice(0, 5);
+        const bestAllrounders = [...playersWithStats].sort((a, b) => ((b.stats.runs || 0) * 0.4 + (b.stats.wickets || 0) * 20) - ((a.stats.runs || 0) * 0.4 + (a.stats.wickets || 0) * 20)).slice(0, 5);
         return { bestBatsmen, bestBowlers, bestAllrounders };
   }
   
@@ -363,5 +420,3 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
-
-    

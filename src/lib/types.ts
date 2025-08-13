@@ -7,6 +7,9 @@ export interface PlayerStats {
   strikeRate: number;
   battingAverage: number;
   bowlingEconomy: number;
+  ballsFaced?: number;
+  oversBowled?: number;
+  runsConceded?: number;
 }
 
 export interface Player {
