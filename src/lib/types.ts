@@ -1,3 +1,4 @@
+
 export interface PlayerStats {
   matches: number;
   runs: number;
@@ -10,6 +11,7 @@ export interface PlayerStats {
   ballsFaced?: number;
   oversBowled?: number;
   runsConceded?: number;
+  timesOut?: number;
 }
 
 export interface Player {
@@ -117,3 +119,5 @@ export interface AppData {
   liveMatch: LiveMatch | null;
   auction: Auction | null;
 }
+
+    

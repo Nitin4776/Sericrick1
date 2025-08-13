@@ -123,18 +123,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const match = matches.find(m => m.id === matchId);
     if (!match || !players.length) return;
   
-    // Function to get full player object from an ID
     const getPlayerById = (playerId: string | { id: string }) => {
         const pId = typeof playerId === 'object' ? playerId.id : playerId;
         return players.find(p => p.id === pId);
     }
   
-    // Find the full player objects for each team
     const team1Players = match.teams[0].players.map(p_id => getPlayerById(p_id as any)).filter(p => p) as Player[];
     const team2Players = match.teams[1].players.map(p_id => getPlayerById(p_id as any)).filter(p => p) as Player[];
   
     const liveMatchData: LiveMatch = {
-      ...JSON.parse(JSON.stringify(match)), // Deep copy to avoid mutation issues
+      ...JSON.parse(JSON.stringify(match)),
       teams: [
         { ...match.teams[0], players: team1Players },
         { ...match.teams[1], players: team2Players }
@@ -302,43 +300,42 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
     match.status = 'completed';
 
-    // Update player stats
     const batch = writeBatch(db);
-    const allPlayerIdsInMatch = [...match.teams[0].players.map(p => p.id), ...match.teams[1].players.map(p => p.id)];
+    const allPlayerIdsInMatch = [...new Set([...match.teams[0].players.map(p => p.id), ...match.teams[1].players.map(p => p.id)])];
     
-    allPlayerIdsInMatch.forEach(playerId => {
+    for (const playerId of allPlayerIdsInMatch) {
       const player = players.find(p => p.id === playerId);
       if (player) {
         const playerRef = doc(db, "players", playerId as string);
         
         let runsScored = 0, ballsFaced = 0, wicketsTaken = 0, runsConceded = 0, oversBowled = 0;
 
-        if (match.scorecard?.inning1.batsmen[playerId]) {
-          runsScored += match.scorecard.inning1.batsmen[playerId].runs;
-          ballsFaced += match.scorecard.inning1.batsmen[playerId].balls;
-        }
-        if (match.scorecard?.inning2.batsmen[playerId]) {
-            runsScored += match.scorecard.inning2.batsmen[playerId].runs;
-            ballsFaced += match.scorecard.inning2.batsmen[playerId].balls;
-        }
-        if (match.scorecard?.inning1.bowlers[playerId]) {
-            wicketsTaken += match.scorecard.inning1.bowlers[playerId].wickets;
-            runsConceded += match.scorecard.inning1.bowlers[playerId].runs;
-            oversBowled += match.scorecard.inning1.bowlers[playerId].overs;
-        }
-        if (match.scorecard?.inning2.bowlers[playerId]) {
-            wicketsTaken += match.scorecard.inning2.bowlers[playerId].wickets;
-            runsConceded += match.scorecard.inning2.bowlers[playerId].runs;
-            oversBowled += match.scorecard.inning2.bowlers[playerId].overs;
+        const innings = [match.scorecard?.inning1, match.scorecard?.inning2];
+        for (const inning of innings) {
+            if (inning?.batsmen[playerId]) {
+                runsScored += inning.batsmen[playerId].runs;
+                ballsFaced += inning.batsmen[playerId].balls;
+            }
+            if (inning?.bowlers[playerId]) {
+                wicketsTaken += inning.bowlers[playerId].wickets;
+                runsConceded += inning.bowlers[playerId].runs;
+                oversBowled += inning.bowlers[playerId].overs;
+            }
         }
         
-        const existingStats = player.stats || { matches: 0, runs: 0, wickets: 0, bestScore: 0, bestBowling: '0-0', strikeRate: 0, battingAverage: 0, bowlingEconomy: 0, ballsFaced: 0, oversBowled: 0, runsConceded: 0 };
+        const existingStats = player.stats || { matches: 0, runs: 0, wickets: 0, ballsFaced: 0, oversBowled: 0, runsConceded: 0, bestScore: 0, bestBowling: '0-0' };
+        
         const newMatches = (existingStats.matches || 0) + 1;
         const newRuns = (existingStats.runs || 0) + runsScored;
         const newBallsFaced = (existingStats.ballsFaced || 0) + ballsFaced;
         const newWickets = (existingStats.wickets || 0) + wicketsTaken;
         const newOversBowled = (existingStats.oversBowled || 0) + oversBowled;
         const newRunsConceded = (existingStats.runsConceded || 0) + runsConceded;
+        
+        const timesOut = Object.values(match.scorecard?.inning1.batsmen || {}).filter(b => b.out && b.playerId === playerId).length +
+                         Object.values(match.scorecard?.inning2.batsmen || {}).filter(b => b.out && b.playerId === playerId).length;
+        const totalTimesOut = (player.stats.timesOut || 0) + timesOut;
+
 
         const updatedStats: PlayerStats = {
           matches: newMatches,
@@ -347,20 +344,21 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           ballsFaced: newBallsFaced,
           oversBowled: newOversBowled,
           runsConceded: newRunsConceded,
+          timesOut: totalTimesOut,
           bestScore: Math.max(existingStats.bestScore || 0, runsScored),
-          bestBowling: existingStats.bestBowling, // complex logic needed
-          battingAverage: newRuns / newMatches,
+          bestBowling: existingStats.bestBowling,
+          battingAverage: totalTimesOut > 0 ? newRuns / totalTimesOut : newRuns,
           strikeRate: newBallsFaced > 0 ? (newRuns / newBallsFaced) * 100 : 0,
           bowlingEconomy: newOversBowled > 0 ? newRunsConceded / newOversBowled : 0,
         };
         batch.update(playerRef, { stats: updatedStats });
       }
-    });
+    }
     
     await batch.commit();
 
     const matchRef = doc(db, "matches", match.id as string);
-    await updateDoc(matchRef, { ...match });
+    await updateDoc(matchRef, { ...match, scorecard: match.scorecard, result: match.result, status: match.status });
     setLiveMatch(null);
   };
 
@@ -368,7 +366,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const playersWithStats = players.filter(p => p.stats && p.stats.matches > 0);
         const bestBatsmen = [...playersWithStats].sort((a, b) => (b.stats.runs || 0) - (a.stats.runs || 0)).slice(0, 5);
         const bestBowlers = [...playersWithStats].sort((a, b) => (b.stats.wickets || 0) - (a.stats.wickets || 0)).slice(0, 5);
-        const bestAllrounders = [...playersWithStats].sort((a, b) => ((b.stats.runs || 0) * 0.4 + (b.stats.wickets || 0) * 20) - ((a.stats.runs || 0) * 0.4 + (a.stats.wickets || 0) * 20)).slice(0, 5);
+        const bestAllrounders = [...playersWithStats]
+            .filter(p => (p.stats.runs || 0) > 0 && (p.stats.wickets || 0) > 0)
+            .sort((a, b) => ((b.stats.runs || 0) * 0.4 + (b.stats.wickets || 0) * 20) - ((a.stats.runs || 0) * 0.4 + (a.stats.wickets || 0) * 20)).slice(0, 5);
         return { bestBatsmen, bestBowlers, bestAllrounders };
   }
   
@@ -420,3 +420,6 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
+
+
+    
