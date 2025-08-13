@@ -195,9 +195,11 @@ export function TournamentDetailPageClient({ tournament }: { tournament: Tournam
 
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [isScorecardOpen, setScorecardOpen] = useState(false);
-  const [formattedDates, setFormattedDates] = useState<string | null>(null);
+  const [formattedDates, setFormattedDates] = useState<string>('');
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
+    setIsClient(true);
     if (tournament && tournament.dates) {
       const start = new Date(tournament.dates.start).toLocaleDateString();
       const end = new Date(tournament.dates.end).toLocaleDateString();
@@ -290,7 +292,7 @@ export function TournamentDetailPageClient({ tournament }: { tournament: Tournam
                         <span className="flex items-center gap-2"><Users /> {tournament.playersPerTeam} players/team</span>
                         <span className="flex items-center gap-2"><MapPin /> {tournament.venue}</span>
                         <span className="flex items-center gap-2">
-                          <Calendar /> {formattedDates || <Skeleton className="h-4 w-40" />}
+                          <Calendar /> {isClient ? formattedDates : <Skeleton className="h-4 w-40" />}
                         </span>
                         <Badge variant={tournament.status === 'completed' ? 'secondary' : 'default'} className="capitalize">{tournament.status}</Badge>
                     </div>
@@ -430,5 +432,3 @@ export function TournamentDetailPageClient({ tournament }: { tournament: Tournam
     </div>
   );
 }
-
-    
