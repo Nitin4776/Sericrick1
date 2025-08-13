@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { ReactNode } from 'react';
@@ -122,8 +123,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const match = matches.find(m => m.id === matchId);
     if (!match) return;
 
+    // Find the full player objects for each team
+    const team1Players = match.teams[0].players.map(p_id => players.find(p => p.id === p_id)).filter(p => p) as Player[];
+    const team2Players = match.teams[1].players.map(p_id => players.find(p => p.id === p_id)).filter(p => p) as Player[];
+
     const liveMatchData: LiveMatch = {
       ...JSON.parse(JSON.stringify(match)), // Deep copy to avoid mutation issues
+      teams: [
+        { ...match.teams[0], players: team1Players },
+        { ...match.teams[1], players: team2Players }
+      ],
       status: 'live',
       scorecard: {
         inning1: { team: null, batsmen: {}, bowlers: {}, extraRuns: 0 },
@@ -348,3 +357,5 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
+
+    
